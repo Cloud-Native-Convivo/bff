@@ -1,0 +1,27 @@
+# Dependencias
+/node_modules
+
+# Build
+/dist
+/build
+
+# Entorno local - NUNCA commitear credenciales
+/.env
+.env.local
+.env.*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Tests
+/coverage
+.nyc_output
+
+# Sistema / editor
+.DS_Store
+*.pem
+.idea
+.vscode/*
+!.vscode/settings.json

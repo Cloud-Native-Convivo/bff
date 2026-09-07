@@ -1,0 +1,24 @@
+import { ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { AuthGuard } from '@nestjs/passport';
+import { PUBLIC_KEY } from './public.decorator';
+
+/**
+ * Guard global de autenticación. Valida el Access Token JWT de Microsoft
+ * Entra ID (firma, issuer, audience, expiración) mediante la estrategia
+ * Passport 'jwt'. Las rutas marcadas con @IsPublic() se omiten.
+ */
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(private readonly reflector: Reflector) {
+    super();
+  }
+
+  canActivate(context: ExecutionContext) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    return isPublic ? true : super.canActivate(context);
+  }
+}
