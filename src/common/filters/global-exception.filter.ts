@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { isAxiosError } from 'axios';
 import type { ErrorResponse } from '../interfaces/error-response';
 
 @Catch()
@@ -38,6 +39,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = Array.isArray(raw) ? raw.join(', ') : String(raw);
       }
       code = HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
+    } else if (isAxiosError(exception)) {
+      if (exception.response) {
+        statusCode = exception.response.status;
+        const body = exception.response.data as Record<string, unknown> | string | undefined;
+        if (typeof body === 'string') {
+          message = body;
+        } else if (body && typeof body === 'object') {
+          const raw = body.detail ?? body.message ?? JSON.stringify(body);
+          message = Array.isArray(raw) ? raw.join(', ') : String(raw);
+        }
+        code = HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
+      } else {
+        statusCode = HttpStatus.BAD_GATEWAY;
+        code = 'BAD_GATEWAY';
+        message = exception.message || 'Error de comunicación con el servicio downstream';
+      }
     }
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {

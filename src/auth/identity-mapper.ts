@@ -15,8 +15,10 @@ export class IdentityMapper {
   constructor(private readonly config: ConfigService) {}
 
   toUsuario(payload: Record<string, unknown>): UsuarioAutenticado {
+    const sub = String(payload.sub ?? payload.oid ?? '');
     return {
-      oid: String(payload.oid),
+      sub,
+      oid: payload.oid ? String(payload.oid) : sub,
       name: typeof payload.name === 'string' ? payload.name : undefined,
       preferredUsername:
         typeof payload.preferred_username === 'string'
@@ -26,6 +28,28 @@ export class IdentityMapper {
         typeof payload.email === 'string' ? payload.email : undefined,
       claims: { ...payload },
       roles: this.leerRoles(payload),
+    };
+  }
+
+  toUsuarioCognito(payload: Record<string, unknown>): UsuarioAutenticado {
+    const sub = String(payload.sub ?? '');
+    const name =
+      typeof payload.name === 'string'
+        ? payload.name
+        : typeof payload.given_name === 'string'
+          ? payload.given_name
+          : undefined;
+    const correo =
+      typeof payload.email === 'string' ? payload.email : undefined;
+
+    return {
+      sub,
+      oid: sub,
+      name,
+      preferredUsername: correo,
+      correo,
+      claims: { ...payload },
+      roles: ['residente'],
     };
   }
 
@@ -45,7 +69,11 @@ export class IdentityMapper {
     const roles = valores
       .map((v) => mapeo[v] ?? v)
       .filter((v): v is Rol =>
-        v === 'administrador' || v === 'conserje' || v === 'comite',
+        v === 'residente' ||
+        v === 'admin' ||
+        v === 'administrador' ||
+        v === 'conserje' ||
+        v === 'comite',
       );
 
     return [...new Set(roles)];
