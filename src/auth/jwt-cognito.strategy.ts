@@ -7,14 +7,16 @@ import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticad
 import { IdentityMapper } from './identity-mapper';
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
+export class JwtCognitoStrategy extends PassportStrategy(Strategy, 'jwt-cognito') {
+  private readonly clientId: string;
+
   constructor(
     config: ConfigService,
     private readonly mapper: IdentityMapper,
   ) {
-    const issuer = config.getOrThrow<string>('entratIssuer');
-    const audience = config.getOrThrow<string>('entratApiClientId');
-    const jwksUri = config.getOrThrow<string>('entratJwksUri');
+    const issuer = config.getOrThrow<string>('cognitoIssuer');
+    const clientId = config.getOrThrow<string>('cognitoAppClientId');
+    const jwksUri = config.getOrThrow<string>('cognitoJwksUri');
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -26,15 +28,22 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
         jwksUri,
       }),
       issuer,
-      audience,
       algorithms: ['RS256'],
     });
+
+    this.clientId = clientId;
   }
 
   async validate(payload: Record<string, unknown>): Promise<UsuarioAutenticado> {
-    if (!payload || (typeof payload.oid !== 'string' && typeof payload.sub !== 'string')) {
-      throw new UnauthorizedException('Token inválido: falta oid o sub');
+    if (!payload || typeof payload.sub !== 'string') {
+      throw new UnauthorizedException('Token inválido: falta sub de Cognito');
     }
-    return this.mapper.toUsuario(payload);
+    const tokenClient = payload.aud ?? payload.client_id;
+    if (tokenClient !== this.clientId) {
+      throw new UnauthorizedException(
+        'Token inválido: audiencia o client_id de Cognito no coincide',
+      );
+    }
+    return this.mapper.toUsuarioCognito(payload);
   }
 }
