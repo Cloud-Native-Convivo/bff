@@ -8,12 +8,14 @@ async function bootstrap(): Promise<void> {
   const globalPrefix = process.env.GLOBAL_PREFIX ?? 'api';
   app.setGlobalPrefix(globalPrefix);
 
-  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+  const corsOrigins = (
+    process.env.CORS_ORIGINS ?? 'http://localhost:5173,http://localhost:4200'
+  )
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   app.enableCors({
-    origin: corsOrigins.length > 0 ? corsOrigins : false,
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
   });
 
