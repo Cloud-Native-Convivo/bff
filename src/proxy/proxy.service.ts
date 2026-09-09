@@ -30,6 +30,7 @@ export class ProxyService {
     query: string,
     body?: unknown,
     headers?: Record<string, string | string[] | undefined>,
+    user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const baseUrl = this.config.get<string>('gastosComunesUrl') ?? '';
     const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
@@ -42,7 +43,7 @@ export class ProxyService {
         url,
         data: body,
         timeout,
-        headers: this.buildForwardHeaders(headers),
+        headers: this.buildForwardHeaders(headers, user),
       }),
     );
 
@@ -118,6 +119,36 @@ export class ProxyService {
   }
 
   /**
+   * Agrega reservas (Espacios Comunes) y gastos comunes del usuario actual
+   * para el panel del residente (RF-T.7). Cada llamada downstream se
+   * aísla: si un microservicio falla, el otro igual responde y el error
+   * queda reportado en `errores` en vez de tumbar el endpoint completo.
+   */
+  async obtenerPanel(
+    headers: Record<string, string | string[] | undefined>,
+    user?: UsuarioAutenticado,
+  ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
+    const errores: string[] = [];
+
+    const [reservas, gastos] = await Promise.all([
+      this.forwardEspacios('GET', '/reservas', '', undefined, headers, user).catch(
+        (error) => {
+          errores.push(`espacios-comunes: ${extractErrorMessage(error)}`);
+          return null;
+        },
+      ),
+      this.forwardGastos('GET', '/gastos', '', undefined, headers, user).catch(
+        (error) => {
+          errores.push(`gastos-comunes: ${extractErrorMessage(error)}`);
+          return null;
+        },
+      ),
+    ]);
+
+    return { reservas, gastos, errores };
+  }
+
+  /**
    * Selecciona los headers que se propagan al microservicio downstream.
    * Si el cliente no envió un identificador de correlación, se genera uno.
    * Inyecta identidad del usuario autenticado (x-usuario-sub y x-usuario-roles).
@@ -160,4 +191,11 @@ function asString(value: string | string[] | undefined): string | undefined {
 
 function newCorrelationId(): string {
   return crypto.randomUUID();
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'error desconocido';
 }
