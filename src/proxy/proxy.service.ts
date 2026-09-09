@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import type { AxiosRequestConfig } from 'axios';
+import CircuitBreaker from 'opossum';
 import { lastValueFrom } from 'rxjs';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
 
@@ -12,10 +14,32 @@ const CORRELATION_HEADER = 'x-correlation-id';
  */
 @Injectable()
 export class ProxyService {
+  private readonly gastosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
+  private readonly espaciosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
+
   constructor(
     private readonly http: HttpService,
     private readonly config: ConfigService,
-  ) {}
+  ) {
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
+    const baseOptions: CircuitBreaker.Options = {
+      timeout,
+      errorThresholdPercentage: 50,
+      resetTimeout: 15000,
+    };
+
+    const doRequest = (requestConfig: AxiosRequestConfig) =>
+      lastValueFrom(this.http.request(requestConfig));
+
+    this.gastosBreaker = new CircuitBreaker(doRequest, {
+      ...baseOptions,
+      name: 'gastos-comunes',
+    });
+    this.espaciosBreaker = new CircuitBreaker(doRequest, {
+      ...baseOptions,
+      name: 'espacios-comunes',
+    });
+  }
 
   /**
    * Reenvía la solicitud del cliente a la URL base del microservicio
@@ -30,23 +54,26 @@ export class ProxyService {
     query: string,
     body?: unknown,
     headers?: Record<string, string | string[] | undefined>,
+    user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const baseUrl = this.config.get<string>('gastosComunesUrl') ?? '';
-    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
     const url = `${baseUrl}${path}${suffix}`;
 
-    const { data } = await lastValueFrom(
-      this.http.request({
+    try {
+      const { data } = (await this.gastosBreaker.fire({
         method,
         url,
         data: body,
         timeout,
-        headers: this.buildForwardHeaders(headers),
-      }),
-    );
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
 
-    return data;
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'gastos-comunes');
+    }
   }
 
   /**
@@ -100,21 +127,68 @@ export class ProxyService {
       targetPath = '/reservas/';
     }
 
-    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
     const url = `${baseUrl}${targetPath}${suffix}`;
 
-    const { data } = await lastValueFrom(
-      this.http.request({
+    try {
+      const { data } = (await this.espaciosBreaker.fire({
         method,
         url,
         data: body,
         timeout,
         headers: this.buildForwardHeaders(headers, user),
-      }),
-    );
+      })) as { data: unknown };
 
-    return data;
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'espacios-comunes');
+    }
+  }
+
+  /**
+   * Agrega reservas (Espacios Comunes) y gastos comunes del usuario actual
+   * para el panel del residente (RF-T.7). Cada llamada downstream se
+   * aísla: si un microservicio falla, el otro igual responde y el error
+   * queda reportado en `errores` en vez de tumbar el endpoint completo.
+   */
+  async obtenerPanel(
+    headers: Record<string, string | string[] | undefined>,
+    user?: UsuarioAutenticado,
+  ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
+    const errores: string[] = [];
+
+    const [reservas, gastos] = await Promise.all([
+      this.forwardEspacios('GET', '/reservas', '', undefined, headers, user).catch(
+        (error) => {
+          errores.push(`espacios-comunes: ${extractErrorMessage(error)}`);
+          return null;
+        },
+      ),
+      this.forwardGastos('GET', '/gastos', '', undefined, headers, user).catch(
+        (error) => {
+          errores.push(`gastos-comunes: ${extractErrorMessage(error)}`);
+          return null;
+        },
+      ),
+    ]);
+
+    return { reservas, gastos, errores };
+  }
+
+  /**
+   * Traduce un error del circuit breaker a 503 controlado (Fallback).
+   * Si el error viene del breaker (abierto o timeout, CircuitBreaker.isOurError)
+   * se devuelve ServiceUnavailableException; si viene del propio microservicio
+   * downstream (p. ej. un 404/400 real), se propaga tal cual.
+   */
+  private toServiceError(error: unknown, servicio: string): Error {
+    if (error instanceof Error && CircuitBreaker.isOurError(error)) {
+      return new ServiceUnavailableException(
+        `Servicio ${servicio} no disponible temporalmente`,
+      );
+    }
+    return error as Error;
   }
 
   /**
@@ -160,4 +234,11 @@ function asString(value: string | string[] | undefined): string | undefined {
 
 function newCorrelationId(): string {
   return crypto.randomUUID();
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'error desconocido';
 }
