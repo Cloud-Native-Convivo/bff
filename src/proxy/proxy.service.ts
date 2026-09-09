@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import type { AxiosRequestConfig } from 'axios';
@@ -21,7 +21,7 @@ export class ProxyService {
     private readonly http: HttpService,
     private readonly config: ConfigService,
   ) {
-    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const baseOptions: CircuitBreaker.Options = {
       timeout,
       errorThresholdPercentage: 50,
@@ -57,19 +57,23 @@ export class ProxyService {
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const baseUrl = this.config.get<string>('gastosComunesUrl') ?? '';
-    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
     const url = `${baseUrl}${path}${suffix}`;
 
-    const { data } = (await this.gastosBreaker.fire({
-      method,
-      url,
-      data: body,
-      timeout,
-      headers: this.buildForwardHeaders(headers, user),
-    })) as { data: unknown };
+    try {
+      const { data } = (await this.gastosBreaker.fire({
+        method,
+        url,
+        data: body,
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
 
-    return data;
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'gastos-comunes');
+    }
   }
 
   /**
@@ -123,19 +127,23 @@ export class ProxyService {
       targetPath = '/reservas/';
     }
 
-    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 10000;
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
     const url = `${baseUrl}${targetPath}${suffix}`;
 
-    const { data } = (await this.espaciosBreaker.fire({
-      method,
-      url,
-      data: body,
-      timeout,
-      headers: this.buildForwardHeaders(headers, user),
-    })) as { data: unknown };
+    try {
+      const { data } = (await this.espaciosBreaker.fire({
+        method,
+        url,
+        data: body,
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
 
-    return data;
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'espacios-comunes');
+    }
   }
 
   /**
@@ -166,6 +174,21 @@ export class ProxyService {
     ]);
 
     return { reservas, gastos, errores };
+  }
+
+  /**
+   * Traduce un error del circuit breaker a 503 controlado (Fallback).
+   * Si el error viene del breaker (abierto o timeout, CircuitBreaker.isOurError)
+   * se devuelve ServiceUnavailableException; si viene del propio microservicio
+   * downstream (p. ej. un 404/400 real), se propaga tal cual.
+   */
+  private toServiceError(error: unknown, servicio: string): Error {
+    if (error instanceof Error && CircuitBreaker.isOurError(error)) {
+      return new ServiceUnavailableException(
+        `Servicio ${servicio} no disponible temporalmente`,
+      );
+    }
+    return error as Error;
   }
 
   /**
