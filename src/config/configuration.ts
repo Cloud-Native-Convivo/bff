@@ -42,7 +42,7 @@ export const configuration = (): AppConfig => {
       process.env.GASTOS_COMUNES_URL ?? 'http://localhost:8081',
     espaciosComunesUrl:
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
-    proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '10000', 10),
+    proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
     rabbitmqEnabled: (process.env.RABBITMQ_ENABLED ?? 'false') === 'true',
     rabbitmqUrls: process.env.RABBITMQ_URLS ?? 'amqp://localhost:5672',
     rabbitmqExchange: process.env.RABBITMQ_EXCHANGE ?? 'convivo',
