@@ -158,6 +158,9 @@ export class ProxyService {
   ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
     const errores: string[] = [];
 
+    // forwardGastos no reescribe el path (a diferencia de forwardEspacios):
+    // hay que pasarle la ruta real del microservicio (@RequestMapping de
+    // GastoComunController), no un alias corto.
     const [reservas, gastos] = await Promise.all([
       this.forwardEspacios('GET', '/reservas', '', undefined, headers, user).catch(
         (error) => {
@@ -165,7 +168,7 @@ export class ProxyService {
           return null;
         },
       ),
-      this.forwardGastos('GET', '/gastos', '', undefined, headers, user).catch(
+      this.forwardGastos('GET', '/api/v1/gastos-comunes', '', undefined, headers, user).catch(
         (error) => {
           errores.push(`gastos-comunes: ${extractErrorMessage(error)}`);
           return null;
