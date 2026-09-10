@@ -70,6 +70,7 @@ export class IdentityMapper {
       .map((v) => mapeo[v] ?? v)
       .filter((v): v is Rol =>
         v === 'residente' ||
+        v === 'propietario' ||
         v === 'admin' ||
         v === 'administrador' ||
         v === 'conserje' ||

@@ -39,7 +39,7 @@ export const configuration = (): AppConfig => {
     claimSeparador: process.env.CLAIM_SEPARADOR ?? ',',
     claimMap,
     gastosComunesUrl:
-      process.env.GASTOS_COMUNES_URL ?? 'http://localhost:8081',
+      process.env.GASTOS_COMUNES_URL ?? 'http://localhost:8083',
     espaciosComunesUrl:
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
     proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
