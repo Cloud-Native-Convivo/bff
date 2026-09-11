@@ -1,4 +1,4 @@
-export type Rol = 'residente' | 'admin' | 'administrador' | 'conserje' | 'comite';
+export type Rol = 'residente' | 'propietario' | 'admin' | 'administrador' | 'conserje' | 'comite';
 
 /**
  * Identidad del usuario autenticado, normalizada a partir del JWT
