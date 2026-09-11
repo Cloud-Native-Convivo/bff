@@ -4,6 +4,7 @@ updates:
   # Dependencias Node (package.json)
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
       day: monday
