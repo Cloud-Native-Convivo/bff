@@ -1,0 +1,28 @@
+# Dependabot — actualizaciones automáticas de dependencias
+version: 2
+updates:
+  # Dependencias Node (package.json)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - node
+    groups:
+      nestjs:
+        patterns:
+          - "@nestjs/*"
+      auth:
+        patterns:
+          - "passport*"
+          - "jwks-rsa"
+          - "class-validator"
+          - "class-transformer"
+      lint-format:
+        patterns:
+          - "eslint*"
+          - "prettier*"
+          - "typescript*"
