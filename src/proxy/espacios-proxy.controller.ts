@@ -68,7 +68,7 @@ export class EspaciosProxyController {
   // Las rutas de espacios deben registrarse después de las de reservas:
   // '*path' también matchea 'reservas', y Express usa la primera ruta
   // registrada que matchee método + path.
-  @Roles('admin', 'conserje')
+  @Roles('admin', 'administrador', 'conserje')
   @Post(RUTAS_ESPACIOS)
   async crearEspacio(
     @Req() req: Request,
@@ -77,7 +77,7 @@ export class EspaciosProxyController {
     return this.forward(req, user);
   }
 
-  @Roles('admin', 'conserje')
+  @Roles('admin', 'administrador', 'conserje')
   @Put(RUTAS_ESPACIOS)
   async actualizarEspacio(
     @Req() req: Request,
@@ -86,7 +86,7 @@ export class EspaciosProxyController {
     return this.forward(req, user);
   }
 
-  @Roles('admin', 'conserje')
+  @Roles('admin', 'administrador', 'conserje')
   @Patch(RUTAS_ESPACIOS)
   async modificarEspacio(
     @Req() req: Request,
@@ -95,7 +95,7 @@ export class EspaciosProxyController {
     return this.forward(req, user);
   }
 
-  @Roles('admin', 'conserje')
+  @Roles('admin', 'administrador', 'conserje')
   @Delete(RUTAS_ESPACIOS)
   async eliminarEspacio(
     @Req() req: Request,

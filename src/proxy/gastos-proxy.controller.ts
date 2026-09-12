@@ -6,7 +6,7 @@ import { Roles } from '../authorization/roles.decorator';
 const GASTOS_PREFIX = '/api/gastos';
 
 @Controller('gastos')
-@Roles('admin', 'conserje', 'comite')
+@Roles('admin', 'administrador', 'conserje', 'comite')
 export class GastosProxyController {
   constructor(private readonly proxy: ProxyService) {}
 
