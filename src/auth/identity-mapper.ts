@@ -75,16 +75,17 @@ export class IdentityMapper {
         v === 'administrador' ||
         v === 'conserje' ||
         v === 'comite',
-      );
+      )
+      .map((v) => (v === 'admin' ? 'administrador' : v));
 
     const rolesUnicos = [...new Set(roles)];
     if (rolesUnicos.length > 0) {
       return rolesUnicos;
     }
 
-    // Entra ID es exclusivo del panel de administración (AGENTS.md §2).
-    // Si el tenant no tiene App Roles configurados en Azure AD, el usuario
-    // autenticado por Entra ID asume rol 'admin' por defecto en el demo.
-    return ['admin'];
+    // Principio de mínimo privilegio (PoLP / OWASP A01):
+    // Si el usuario autenticado en Entra ID no tiene ningún App Role asignado
+    // en el tenant, no asume privilegios administrativos por defecto.
+    return [];
   }
 }

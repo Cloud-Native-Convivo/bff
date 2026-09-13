@@ -7,6 +7,16 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.3.1] - 2026-09-13
+
+### Corregido
+
+- Propagación de identidad verificada (`@UsuarioActual()`) en `GastosProxyController` para prevenir suplantación de headers downstream.
+- Apertura de consulta `GET` en gastos comunes para cualquier usuario autenticado (residente, propietario, admin).
+- Filtro `errorFilter` en circuit breaker de `opossum` para evitar contabilizar errores 4xx como fallas de disponibilidad del servicio.
+- Mapeo de rol `admin` hacia `administrador` en `IdentityMapper` y eliminación de fallback con privilegios administrativos sin App Roles en Azure Entra ID (OWASP A01 / PoLP).
+- Registro detallado de diagnóstico por rechazo de validación JWT en `JwtAuthGuard`.
+
 ## [0.3.0] - 2026-09-12
 
 ### Agregado
@@ -40,5 +50,6 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.3.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.2.0
