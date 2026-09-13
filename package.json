@@ -43,7 +43,7 @@
     "@nestjs/schematics": "^12.0.0",
     "@nestjs/testing": "^12.0.1",
     "@types/express": "^5.0.6",
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "@types/opossum": "^8.1.9",
     "@types/passport-jwt": "^4.0.1",
     "eslint": "^10.0.0",
