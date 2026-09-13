@@ -77,6 +77,14 @@ export class IdentityMapper {
         v === 'comite',
       );
 
-    return [...new Set(roles)];
+    const rolesUnicos = [...new Set(roles)];
+    if (rolesUnicos.length > 0) {
+      return rolesUnicos;
+    }
+
+    // Entra ID es exclusivo del panel de administración (AGENTS.md §2).
+    // Si el tenant no tiene App Roles configurados en Azure AD, el usuario
+    // autenticado por Entra ID asume rol 'admin' por defecto en el demo.
+    return ['admin'];
   }
 }

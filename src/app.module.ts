@@ -8,6 +8,7 @@ import { ProxyModule } from './proxy/proxy.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { RolesGuard } from './authorization/roles.guard';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { MessagingModule } from './messaging/messaging.module';
 
 @Module({
@@ -24,6 +25,10 @@ import { MessagingModule } from './messaging/messaging.module';
     MessagingModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: RolesGuard,

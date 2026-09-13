@@ -12,11 +12,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     JwtStrategy,
     JwtCognitoStrategy,
     IdentityMapper,
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
-    },
+    JwtAuthGuard,
   ],
-  exports: [IdentityMapper],
+  exports: [IdentityMapper, JwtAuthGuard],
 })
 export class AuthModule {}

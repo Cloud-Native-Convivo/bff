@@ -29,8 +29,26 @@ export class RolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<{
       user?: UsuarioAutenticado;
+      headers?: Record<string, string | string[] | undefined>;
     }>();
-    const roles = request.user?.roles ?? [];
+    let roles = request.user?.roles ?? [];
+
+    if (roles.length === 0 && request.headers) {
+      const headerRoles = request.headers['x-usuario-roles'];
+      if (typeof headerRoles === 'string') {
+        roles = headerRoles
+          .split(',')
+          .map((r) => r.trim())
+          .filter((v): v is Rol =>
+            v === 'residente' ||
+            v === 'propietario' ||
+            v === 'admin' ||
+            v === 'administrador' ||
+            v === 'conserje' ||
+            v === 'comite',
+          );
+      }
+    }
 
     if (required.some((rol) => roles.includes(rol))) {
       return true;

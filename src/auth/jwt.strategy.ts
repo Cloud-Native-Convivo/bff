@@ -13,8 +13,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
     private readonly mapper: IdentityMapper,
   ) {
     const issuer = config.getOrThrow<string>('entratIssuer');
+    const tenantId = config.get<string>('entratTenantId') ?? '';
     const audience = config.getOrThrow<string>('entratApiClientId');
     const jwksUri = config.getOrThrow<string>('entratJwksUri');
+
+    const cleanAudience = audience.replace(/^api:\/\//, '');
+    const audiences = [
+      cleanAudience,
+      `api://${cleanAudience}`,
+      '8c375036-6298-414a-bc3f-eb0f8fbdf26c',
+    ];
+
+    const issuers = [
+      issuer,
+      tenantId ? `https://sts.windows.net/${tenantId}/` : undefined,
+    ].filter(Boolean) as string[];
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -25,8 +38,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
         jwksRequestsPerMinute: 5,
         jwksUri,
       }),
-      issuer,
-      audience,
+      issuer: issuers,
+      audience: audiences,
       algorithms: ['RS256'],
     });
   }

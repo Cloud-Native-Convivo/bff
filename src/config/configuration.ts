@@ -24,6 +24,7 @@ export const configuration = (): AppConfig => {
     entratTenantId: tenantId,
     entratApiClientId:
       process.env.ENTRA_API_CLIENT_ID ??
+      process.env.ENTRA_AUDIENCE ??
       '528af346-c37c-40a0-9f7e-30162de3c027',
     entratIssuer:
       process.env.ENTRA_ISSUER ??
