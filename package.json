@@ -1,6 +1,6 @@
 {
   "name": "convivo-bff",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "BFF (Backend for Frontend) de CONVIVO - punto central entre AWS API Gateway y los microservicios",
   "private": true,
   "license": "UNLICENSED",
