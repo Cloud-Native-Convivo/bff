@@ -7,6 +7,12 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.3.2] - 2026-09-13
+
+### Corregido
+
+- Preservación de header downstream `x-usuario-roles` cuando el token JWT de Azure Entra ID no posee App Roles asignados (array vacío de roles ya no evalúa a string vacío ni anula el fallback entrante).
+
 ## [0.3.1] - 2026-09-13
 
 ### Corregido
@@ -50,6 +56,7 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.3.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.2.0
