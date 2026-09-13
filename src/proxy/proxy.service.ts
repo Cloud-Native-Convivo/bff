@@ -2,6 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import type { AxiosRequestConfig } from 'axios';
+import { isAxiosError } from 'axios';
 import CircuitBreaker from 'opossum';
 import { lastValueFrom } from 'rxjs';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
@@ -26,6 +27,15 @@ export class ProxyService {
       timeout,
       errorThresholdPercentage: 50,
       resetTimeout: 15000,
+      // Un 401/403/404 es un rechazo válido del downstream (token o dato
+      // invalido), no una falla de disponibilidad -- sin esto, Opossum los
+      // cuenta como error, abre el circuito, y esconde el 401 real detras
+      // de un 503 para TODOS los usuarios durante el resetTimeout.
+      errorFilter: (err: unknown) =>
+        isAxiosError(err) &&
+        typeof err.response?.status === 'number' &&
+        err.response.status >= 400 &&
+        err.response.status < 500,
     };
 
     const doRequest = (requestConfig: AxiosRequestConfig) =>
