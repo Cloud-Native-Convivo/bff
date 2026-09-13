@@ -232,7 +232,9 @@ export class ProxyService {
     forward['x-usuario-sub'] =
       user?.sub ?? asString(source['x-usuario-sub']) ?? 'anonimo';
     forward['x-usuario-roles'] =
-      user?.roles.join(',') ?? asString(source['x-usuario-roles']) ?? '';
+      user?.roles && user.roles.length > 0
+        ? user.roles.join(',')
+        : (asString(source['x-usuario-roles']) ?? '');
 
     return forward;
   }
