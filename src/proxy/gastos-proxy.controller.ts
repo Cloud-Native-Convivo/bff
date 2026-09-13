@@ -1,10 +1,12 @@
 import { All, Controller, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { ProxyService } from './proxy.service';
+import { Roles } from '../authorization/roles.decorator';
 
 const GASTOS_PREFIX = '/api/gastos';
 
 @Controller('gastos')
+@Roles('admin', 'administrador', 'conserje', 'comite')
 export class GastosProxyController {
   constructor(private readonly proxy: ProxyService) {}
 
