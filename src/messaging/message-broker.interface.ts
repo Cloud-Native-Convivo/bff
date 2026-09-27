@@ -1,10 +1,11 @@
 /**
- * Contrato de mensajería asíncrona del BFF.
+ * Contrato de mensajería asíncrona y nivelación de carga (Queue-based Load Leveling) del BFF.
  *
- * La integración con RabbitMQ / Amazon MQ se implementará posteriormente,
- * leyendo la conexión desde variables de entorno (RABBITMQ_URLS,
- * RABBITMQ_EXCHANGE). Por ahora solo se define la API.
+ * Centraliza la publicación, amortiguación y balanceo de carga en RabbitMQ
+ * para evitar la sobrecarga de microservicios de dominio (ms-espacios-comunes y ms-gastos-comunes).
  */
 export interface MessageBroker {
   publish(exchange: string, routingKey: string, payload: unknown): Promise<void>;
+  sendToQueue(queue: string, payload: unknown, options?: { priority?: number }): Promise<void>;
+  isReady(): boolean;
 }

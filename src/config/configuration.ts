@@ -43,10 +43,12 @@ export const configuration = (): AppConfig => {
       process.env.GASTOS_COMUNES_URL ?? 'http://localhost:8083',
     espaciosComunesUrl:
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
+    eurekaUrl:
+      process.env.EUREKA_URL ?? 'http://admin:admin123@localhost:8761/eureka',
     proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
     rabbitmqEnabled: (process.env.RABBITMQ_ENABLED ?? 'false') === 'true',
     rabbitmqUrls: process.env.RABBITMQ_URLS ?? 'amqp://localhost:5672',
-    rabbitmqExchange: process.env.RABBITMQ_EXCHANGE ?? 'convivo',
+    rabbitmqExchange: process.env.RABBITMQ_EXCHANGE ?? 'espacios_events',
   };
 };
 

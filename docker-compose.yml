@@ -1,0 +1,37 @@
+services:
+  bff:
+    build: .
+    container_name: bff
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      GLOBAL_PREFIX: api
+      CORS_ORIGINS: http://localhost:5173,http://localhost:4200
+      EUREKA_URL: http://admin:${EUREKA_PASSWORD:-admin123}@discovery-server:8761/eureka/
+      ESPACIOS_COMUNES_URL: http://ms-espacios-comunes:8082
+      GASTOS_COMUNES_URL: http://ms-gastos-comunes:8083
+      PROXY_TIMEOUT_MS: 2000
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_URLS: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
+      RABBITMQ_EXCHANGE: espacios_events
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-936612c7-66b8-41ba-a9dd-83f50365f818}
+      ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID:-528af346-c37c-40a0-9f7e-30162de3c027}
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-us-east-1_jmLnvOaUx}
+      COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID:-597noe991s5ebj8ab2blpvkjm0}
+      COGNITO_REGION: ${COGNITO_REGION:-us-east-1}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    networks:
+      - convivo-network
+
+networks:
+  convivo-network:
+    external: true
+    name: convivo-network

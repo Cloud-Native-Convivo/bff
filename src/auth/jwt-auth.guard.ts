@@ -8,10 +8,10 @@ import { PUBLIC_KEY } from './public.decorator';
 function isPublicEspacioGet(method: string, url: string): boolean {
   if (method !== 'GET') return false;
   const path = url.split('?')[0].replace(/\/+$/, '');
+  if (path.includes('/reservas')) return false;
   return (
     path === '/api/v1/espacios-comunes' ||
-    path === '/api/v1/espacios-comunes/espacios' ||
-    path.startsWith('/api/v1/espacios-comunes/espacios/') ||
+    path.startsWith('/api/v1/espacios-comunes/') ||
     path === '/api/espacios' ||
     path.startsWith('/api/espacios/')
   );

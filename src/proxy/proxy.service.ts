@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios';
 import CircuitBreaker from 'opossum';
 import { lastValueFrom } from 'rxjs';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+import { EurekaDiscoveryService } from './eureka-discovery.service';
 
 const CORRELATION_HEADER = 'x-correlation-id';
 
@@ -21,6 +22,7 @@ export class ProxyService {
   constructor(
     private readonly http: HttpService,
     private readonly config: ConfigService,
+    private readonly eureka: EurekaDiscoveryService,
   ) {
     const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const baseOptions: CircuitBreaker.Options = {
@@ -66,7 +68,8 @@ export class ProxyService {
     headers?: Record<string, string | string[] | undefined>,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
-    const baseUrl = this.config.get<string>('gastosComunesUrl') ?? '';
+    const fallbackUrl = this.config.get<string>('gastosComunesUrl') ?? 'http://localhost:8083';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-GASTOS-COMUNES', fallbackUrl);
     const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
     const url = `${baseUrl}${path}${suffix}`;
@@ -99,8 +102,9 @@ export class ProxyService {
     headers?: Record<string, string | string[] | undefined>,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
-    let baseUrl =
+    const fallbackUrl =
       this.config.get<string>('espaciosComunesUrl') ?? 'http://localhost:8082';
+    let baseUrl = await this.eureka.resolveServiceUrl('MS-ESPACIOS-COMUNES', fallbackUrl);
     baseUrl = baseUrl.replace(/\/+$/, '');
     if (!baseUrl.endsWith('/api/v1')) {
       baseUrl = `${baseUrl}/api/v1`;
