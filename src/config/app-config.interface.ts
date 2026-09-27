@@ -18,6 +18,7 @@ export interface AppConfig {
   gastosComunesUrl: string;
   espaciosComunesUrl: string;
   proxyTimeoutMs: number;
+  eurekaUrl: string;
   rabbitmqEnabled: boolean;
   rabbitmqUrls: string;
   rabbitmqExchange: string;
