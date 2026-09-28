@@ -43,14 +43,33 @@ export const configuration = (): AppConfig => {
       process.env.GASTOS_COMUNES_URL ?? 'http://localhost:8083',
     espaciosComunesUrl:
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
-    eurekaUrl:
-      process.env.EUREKA_URL ?? 'http://admin:admin123@localhost:8761/eureka',
+    eurekaUrl: resolveEurekaUrl(),
     proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
     rabbitmqEnabled: (process.env.RABBITMQ_ENABLED ?? 'false') === 'true',
     rabbitmqUrls: process.env.RABBITMQ_URLS ?? 'amqp://localhost:5672',
     rabbitmqExchange: process.env.RABBITMQ_EXCHANGE ?? 'espacios_events',
   };
 };
+
+function resolveEurekaUrl(): string {
+  if (process.env.EUREKA_URL) {
+    return process.env.EUREKA_URL;
+  }
+  const user = process.env.EUREKA_USER ?? 'admin';
+  const password = process.env.EUREKA_PASSWORD;
+  const host = process.env.EUREKA_HOST ?? 'localhost:8761';
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!password) {
+      throw new Error(
+        'EUREKA_PASSWORD es obligatoria en entorno de produccion (Fail-Closed)',
+      );
+    }
+    return `http://${user}:${password}@${host}/eureka`;
+  }
+
+  return `http://${user}:${password ?? 'admin123'}@${host}/eureka`;
+}
 
 function splitList(value?: string): string[] {
   return (value ?? '')
