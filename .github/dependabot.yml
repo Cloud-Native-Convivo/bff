@@ -27,3 +27,33 @@ updates:
           - "eslint*"
           - "prettier*"
           - "typescript*"
+
+  # Actions de GitHub (versiones fijadas por SHA)
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Imagen base del Dockerfile
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - docker
+    groups:
+      docker-base:
+        patterns:
+          - "*"

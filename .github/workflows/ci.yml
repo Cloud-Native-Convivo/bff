@@ -6,14 +6,99 @@ on:
       - develop
       - main
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: bff-convivo
+
 jobs:
   build-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: "20"
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22" # igual que el Dockerfile
+          cache: npm
+      - name: Detectar tests
+        id: tests
+        run: |
+          if [ -n "$(find . -path ./node_modules -prune -o -name '*.spec.ts' -print -quit)" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sin archivos *.spec.ts: se omiten tests y cobertura"
+          fi
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - name: Tests con cobertura
+        if: steps.tests.outputs.found == 'true'
+        run: npm test -- --ci --coverage --json --outputFile=report.json
+      # Un PR desde fork recibe token de solo lectura: no puede comentar
+      - name: Comentario de cobertura
+        if: steps.tests.outputs.found == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: ArtiomTr/jest-coverage-report-action@262a7bb0b20c4d1d6b6b026af0f008f78da72788 # v2.3.1
+        with:
+          skip-step: all
+          coverage-file: report.json
+          annotations: none
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+          ignore: DL3018 # apk add sin version fija
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build de imagen (sin push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:pr
+          cache-from: type=gha
+      # Primer scan informativo (CRITICAL+HIGH), segundo gate solo CRITICAL
+      - name: Trivy resumen
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:pr
+          format: table
+          output: trivy.txt
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "0"
+      - name: Publicar resumen Trivy
+        run: |
+          {
+            echo '### Trivy (CRITICAL, HIGH; solo con fix disponible)'
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy gate CRITICAL
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:pr
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
