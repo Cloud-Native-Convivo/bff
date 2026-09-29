@@ -7,6 +7,12 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.4.3] - 2026-09-29
+
+### Seguridad
+
+- Las respuestas 502 (sin respuesta del microservicio: conexión rechazada, DNS o timeout) ya no exponen host ni puerto internos; el cliente recibe un mensaje genérico y el detalle queda en el log (OWASP A10).
+
 ## [0.4.2] - 2026-09-29
 
 ### Corregido
@@ -95,6 +101,7 @@ Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag qued
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.4.3]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.3
 [0.4.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.0
