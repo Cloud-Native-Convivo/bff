@@ -7,6 +7,17 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-09-29
+
+### Cambiado
+
+- **Runtime Node 24 LTS**: imagen `node:24-alpine` (fijada por digest) en las tres etapas, CI con Node 24, `engines` `>=24` y `@types/node` 24. Antes: Node 22.
+- CI: Trivy fijado en v0.74.0 (la versión por defecto de `trivy-action` era 0.70.0).
+
+### Notas de despliegue
+
+- Sigue siendo obligatoria `EUREKA_PASSWORD` en producción.
+
 ## [0.4.3] - 2026-09-29
 
 ### Seguridad
@@ -101,6 +112,7 @@ Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag qued
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.5.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.5.0
 [0.4.3]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.3
 [0.4.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.1
