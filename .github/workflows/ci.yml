@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22" # igual que el Dockerfile
+          node-version: "24" # igual que el Dockerfile
           cache: npm
       - name: Detectar tests
         id: tests
@@ -80,6 +80,8 @@ jobs:
       - name: Trivy resumen
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           image-ref: ${{ env.IMAGE_NAME }}:pr
           format: table
           output: trivy.txt
@@ -97,6 +99,8 @@ jobs:
       - name: Trivy gate CRITICAL
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          # trivy-action v0.36.0 trae Trivy 0.70.0 por defecto; Dependabot no actualiza este valor
+          version: v0.74.0
           image-ref: ${{ env.IMAGE_NAME }}:pr
           format: table
           severity: CRITICAL
