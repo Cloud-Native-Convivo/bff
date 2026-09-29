@@ -51,15 +51,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         }
         code = HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
       } else {
+        // Sin respuesta del downstream (ECONNREFUSED, DNS, timeout): el mensaje
+        // de axios trae host y puerto internos. Solo va al log, nunca al cliente.
         statusCode = HttpStatus.BAD_GATEWAY;
         code = 'BAD_GATEWAY';
-        message = exception.message || 'Error de comunicación con el servicio downstream';
+        message = 'Servicio no disponible temporalmente';
       }
     }
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const detalle = exception instanceof Error ? exception.message : message;
       this.logger.error(
-        `[${request.method}] ${request.url} -> ${statusCode} ${message}`,
+        `[${request.method}] ${request.url} -> ${statusCode} ${detalle}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     }
