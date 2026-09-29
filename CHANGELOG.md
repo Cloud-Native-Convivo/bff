@@ -7,6 +7,30 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-09-29
+
+Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag quedó apuntando a un merge local y se eliminó).
+
+### Agregado
+
+- Servicio de mensajería con RabbitMQ (Queue-based Load Leveling): arranque tolerante a fallos si el broker no está disponible y reconexión automática en segundo plano.
+- Descubrimiento de microservicios vía Eureka (`EurekaDiscoveryService`).
+- `docker-compose.yml` para levantar el BFF localmente.
+- CI con señales en cada PR: CodeQL, dependency review, escaneo Trivy de la imagen antes de publicarla, hadolint, lint de workflows (actionlint, zizmor), validación del título del PR y OpenSSF Scorecard. Dependabot para npm, Docker y GitHub Actions con cooldown de 7 días.
+
+### Cambiado
+
+- **Despliegue:** con `NODE_ENV=production` el BFF no arranca si falta `EUREKA_PASSWORD` (fail-closed). Configurar la variable antes de desplegar.
+- Las rutas `GET` bajo `/api/v1/espacios-comunes/` son públicas, salvo las de `/reservas`, que siguen exigiendo token.
+- Imagen Docker sin dependencias de desarrollo.
+- NestJS 12.0.1 → 12.1.0 (grupo `@nestjs/*`), `multer` 2.4.0 vía `@nestjs/platform-express`.
+- Dependencias de desarrollo: eslint 10.11.0, prettier 3.9.9, typescript-eslint 8.70.1, webpack 5.111.1, `@types/node` 26.6.3.
+
+### Seguridad
+
+- Credenciales de Eureka obligatorias en producción; se elimina el uso silencioso de la contraseña por defecto.
+- `multer` 2.4.0 cierra CVE-2026-77078, CVE-2026-77037, CVE-2026-82333 y CVE-2026-77063.
+
 ## [0.3.2] - 2026-09-13
 
 ### Corregido
@@ -56,6 +80,7 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.4.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.0
 [0.3.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.0
