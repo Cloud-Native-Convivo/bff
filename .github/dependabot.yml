@@ -3,6 +3,12 @@ version: 2
 updates:
   # Dependencias Node (package.json)
   - package-ecosystem: npm
+
+    # Espera 7 dias antes de proponer una version nueva (mitiga paquetes comprometidos recien publicados)
+
+    cooldown:
+
+      default-days: 7
     directory: /
     target-branch: develop
     schedule:
@@ -27,3 +33,45 @@ updates:
           - "eslint*"
           - "prettier*"
           - "typescript*"
+
+  # Actions de GitHub (versiones fijadas por SHA)
+  - package-ecosystem: github-actions
+
+    # Espera 7 dias antes de proponer una version nueva (mitiga paquetes comprometidos recien publicados)
+
+    cooldown:
+
+      default-days: 7
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Imagen base del Dockerfile
+  - package-ecosystem: docker
+
+    # Espera 7 dias antes de proponer una version nueva (mitiga paquetes comprometidos recien publicados)
+
+    cooldown:
+
+      default-days: 7
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - docker
+    groups:
+      docker-base:
+        patterns:
+          - "*"
