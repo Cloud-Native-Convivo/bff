@@ -7,7 +7,11 @@ Solo la última versión publicada en `main` recibe correcciones de seguridad.
 ## Reportar una vulnerabilidad
 
 No abras un issue público. Usa el reporte privado de GitHub:
-**Security → Report a vulnerability** en este repositorio.
+<https://github.com/Cloud-Native-Convivo/bff/security/advisories/new>
+(también en **Security → Report a vulnerability**).
+
+Más información sobre este canal:
+<https://docs.github.com/es/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability>
 
 Incluye, si puedes:
 
