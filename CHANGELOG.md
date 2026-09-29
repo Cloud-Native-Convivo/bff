@@ -7,6 +7,12 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.4.2] - 2026-09-29
+
+### Corregido
+
+- `SECURITY.md` enlaza el formulario de reporte privado de vulnerabilidades, que además quedó habilitado en el repositorio (en 0.4.1 el documento remitía a un canal desactivado).
+
 ## [0.4.1] - 2026-09-29
 
 ### Seguridad
@@ -89,6 +95,7 @@ Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag qued
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.4.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.2
 [0.4.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.0
 [0.3.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.2
