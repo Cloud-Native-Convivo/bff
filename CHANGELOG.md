@@ -7,6 +7,15 @@ y este proyecto adhiere a [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [0.4.1] - 2026-09-29
+
+### Seguridad
+
+- Imagen Docker sin npm, npx, corepack ni yarn: el contenedor solo ejecuta `node` y esas herramientas de la imagen base traían 8 CVEs (7 HIGH, 1 MEDIUM). Escaneo Trivy de la imagen: 0 vulnerabilidades.
+- Imagen base `node:22-alpine` fijada por digest en las tres etapas del build; Dependabot mantiene el digest actualizado.
+- actionlint en CI se ejecuta desde la imagen oficial fijada por digest, en vez de descargar y ejecutar un script remoto.
+- Nueva política de seguridad (`SECURITY.md`) con canal privado de reporte.
+
 ## [0.4.0] - 2026-09-29
 
 Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag quedó apuntando a un merge local y se eliminó).
@@ -80,6 +89,7 @@ Incluye el contenido previsto para 0.3.3, que nunca llegó a `main` (su tag qued
 - Fallback 503 explícito (`ServiceUnavailableException`) cuando el circuit
   breaker está abierto, en vez de dejar la promesa rechazada sin manejar.
 
+[0.4.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.4.0
 [0.3.2]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Cloud-Native-Convivo/bff/releases/tag/v0.3.1
