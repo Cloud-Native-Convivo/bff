@@ -19,7 +19,7 @@ function isPublicEspacioGet(method: string, url: string): boolean {
 
 /**
  * Guard global de autenticación dual (Entra ID + Cognito).
- * Valida el Access/ID Token JWT mediante las estrategias Passport
+ * Valida el Access Token JWT (nunca el ID token) mediante las estrategias Passport
  * 'jwt-entra' y 'jwt-cognito'. Las rutas marcadas con @IsPublic() se omiten.
  * El catálogo de espacios (`isPublicEspacioGet`) es público: si trae token
  * válido, resuelve identidad igual; si no trae token o el token es

@@ -39,14 +39,19 @@ export class IdentityMapper {
         : typeof payload.given_name === 'string'
           ? payload.given_name
           : undefined;
+    // El access token de Cognito no trae email/name (solo sub, username,
+    // client_id, scope); quedan undefined salvo que un trigger Pre Token
+    // Generation los agregue. La identidad para ownership es `sub`.
     const correo =
       typeof payload.email === 'string' ? payload.email : undefined;
+    const username =
+      typeof payload.username === 'string' ? payload.username : undefined;
 
     return {
       sub,
       oid: sub,
       name,
-      preferredUsername: correo,
+      preferredUsername: correo ?? username,
       correo,
       claims: { ...payload },
       roles: ['residente'],

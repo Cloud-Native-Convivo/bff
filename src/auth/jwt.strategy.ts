@@ -17,12 +17,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
     const audience = config.getOrThrow<string>('entratApiClientId');
     const jwksUri = config.getOrThrow<string>('entratJwksUri');
 
+    // Solo la audiencia de la API (access token emitido para el scope
+    // api://<api>/access_as_user). No se acepta el client ID del panel
+    // (8c375036-...): un token con esa audiencia es el ID token del panel, que
+    // identifica al usuario ante el front pero no autoriza llamadas a la API.
     const cleanAudience = audience.replace(/^api:\/\//, '');
-    const audiences = [
-      cleanAudience,
-      `api://${cleanAudience}`,
-      '8c375036-6298-414a-bc3f-eb0f8fbdf26c',
-    ];
+    const audiences = [cleanAudience, `api://${cleanAudience}`];
 
     const issuers = [
       issuer,
