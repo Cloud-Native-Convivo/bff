@@ -3,11 +3,12 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { firstValueFrom, isObservable } from 'rxjs';
+import { stripTrailingSlashes } from '../common/strip-trailing-slashes';
 import { PUBLIC_KEY } from './public.decorator';
 
 function isPublicEspacioGet(method: string, url: string): boolean {
   if (method !== 'GET') return false;
-  const path = url.split('?')[0].replace(/\/+$/, '');
+  const path = stripTrailingSlashes(url.split('?')[0]);
   if (path.includes('/reservas')) return false;
   return (
     path === '/api/v1/espacios-comunes' ||
