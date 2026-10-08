@@ -8,8 +8,67 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { isAxiosError } from 'axios';
+import { isAxiosError, type AxiosError } from 'axios';
 import type { ErrorResponse } from '../interfaces/error-response';
+
+interface ErrorClasificado {
+  statusCode: number;
+  code: string;
+  message: string;
+}
+
+/** Texto legible de un valor de mensaje: arreglos unidos, objetos serializados (nunca "[object Object]"). */
+function aTexto(raw: unknown): string {
+  if (Array.isArray(raw)) return raw.join(', ');
+  return typeof raw === 'string' ? raw : JSON.stringify(raw);
+}
+
+function codigoHttp(statusCode: number): string {
+  return HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
+}
+
+function desdeHttpException(exception: HttpException): ErrorClasificado {
+  const statusCode = exception.getStatus();
+  const body = exception.getResponse();
+  let message = 'Error interno del servidor';
+  if (typeof body === 'string') {
+    message = body;
+  } else if (typeof body === 'object' && body !== null && 'message' in body) {
+    message = aTexto((body as { message: unknown }).message);
+  }
+  return { statusCode, code: codigoHttp(statusCode), message };
+}
+
+function desdeAxios(exception: AxiosError): ErrorClasificado {
+  if (!exception.response) {
+    // Sin respuesta del downstream (ECONNREFUSED, DNS, timeout): el mensaje
+    // de axios trae host y puerto internos. Solo va al log, nunca al cliente.
+    return {
+      statusCode: HttpStatus.BAD_GATEWAY,
+      code: 'BAD_GATEWAY',
+      message: 'Servicio no disponible temporalmente',
+    };
+  }
+  const statusCode = exception.response.status;
+  const body = exception.response.data as Record<string, unknown> | string | undefined;
+  let message = 'Error interno del servidor';
+  if (typeof body === 'string') {
+    message = body;
+  } else if (body && typeof body === 'object') {
+    message = aTexto(body.detail ?? body.message ?? JSON.stringify(body));
+  }
+  return { statusCode, code: codigoHttp(statusCode), message };
+}
+
+function clasificarError(exception: unknown): ErrorClasificado {
+  if (exception instanceof HttpException) return desdeHttpException(exception);
+  if (isAxiosError(exception)) return desdeAxios(exception);
+  return {
+    statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Error interno del servidor',
+  };
+}
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -21,43 +80,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<{ id?: string; method: string; url: string }>();
     const requestId = request.id ?? randomUUID();
 
-    let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let code = 'INTERNAL_SERVER_ERROR';
-    let message = 'Error interno del servidor';
-
-    if (exception instanceof HttpException) {
-      statusCode = exception.getStatus();
-      const body = exception.getResponse();
-      if (typeof body === 'string') {
-        message = body;
-      } else if (
-        typeof body === 'object' &&
-        body !== null &&
-        'message' in body
-      ) {
-        const raw = (body as { message: unknown }).message;
-        message = Array.isArray(raw) ? raw.join(', ') : String(raw);
-      }
-      code = HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
-    } else if (isAxiosError(exception)) {
-      if (exception.response) {
-        statusCode = exception.response.status;
-        const body = exception.response.data as Record<string, unknown> | string | undefined;
-        if (typeof body === 'string') {
-          message = body;
-        } else if (body && typeof body === 'object') {
-          const raw = body.detail ?? body.message ?? JSON.stringify(body);
-          message = Array.isArray(raw) ? raw.join(', ') : String(raw);
-        }
-        code = HttpStatus[statusCode] ?? `HTTP_${statusCode}`;
-      } else {
-        // Sin respuesta del downstream (ECONNREFUSED, DNS, timeout): el mensaje
-        // de axios trae host y puerto internos. Solo va al log, nunca al cliente.
-        statusCode = HttpStatus.BAD_GATEWAY;
-        code = 'BAD_GATEWAY';
-        message = 'Servicio no disponible temporalmente';
-      }
-    }
+    const { statusCode, code, message } = clasificarError(exception);
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
       const detalle = exception instanceof Error ? exception.message : message;

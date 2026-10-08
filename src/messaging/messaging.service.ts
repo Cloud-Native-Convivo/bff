@@ -59,7 +59,7 @@ export class MessagingService
     if (!this.isReady()) {
       this.logger.warn(
         `publish buffering/fallback (RabbitMQ no conectado aún): ${exchange}/${routingKey}`,
-        typeof payload === 'object' ? JSON.stringify(payload) : String(payload),
+        typeof payload === 'string' ? payload : JSON.stringify(payload),
       );
       return;
     }

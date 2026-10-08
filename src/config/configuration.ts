@@ -17,7 +17,7 @@ export const configuration = (): AppConfig => {
 
   return {
     nodeEnv: process.env.NODE_ENV ?? 'development',
-    port: parseInt(process.env.PORT ?? '3000', 10),
+    port: Number.parseInt(process.env.PORT ?? '3000', 10),
     corsOrigins: splitList(process.env.CORS_ORIGINS),
     globalPrefix: process.env.GLOBAL_PREFIX ?? 'api',
     serviceName: process.env.SERVICE_NAME ?? 'convivo-bff',
@@ -44,7 +44,7 @@ export const configuration = (): AppConfig => {
     espaciosComunesUrl:
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
     eurekaUrl: resolveEurekaUrl(),
-    proxyTimeoutMs: parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
+    proxyTimeoutMs: Number.parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
     rabbitmqEnabled: (process.env.RABBITMQ_ENABLED ?? 'false') === 'true',
     rabbitmqUrls: process.env.RABBITMQ_URLS ?? 'amqp://localhost:5672',
     rabbitmqExchange: process.env.RABBITMQ_EXCHANGE ?? 'espacios_events',

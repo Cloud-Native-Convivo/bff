@@ -6,9 +6,41 @@ import { isAxiosError } from 'axios';
 import CircuitBreaker from 'opossum';
 import { lastValueFrom } from 'rxjs';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+import { stripTrailingSlashes } from '../common/strip-trailing-slashes';
 import { EurekaDiscoveryService } from './eureka-discovery.service';
 
 const CORRELATION_HEADER = 'x-correlation-id';
+
+type HeadersEntrantes = Record<string, string | string[] | undefined>;
+
+const PREFIJO_ESPACIOS_BFF = '/api/v1/espacios-comunes';
+
+/**
+ * Traduce la ruta pública del BFF a la ruta del microservicio de Espacios
+ * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf / mvp.md) se
+ * reescribe a /reservas/ inyectando espacio_id en el body.
+ */
+export function resolverRutaEspacios(path: string, body?: unknown): string {
+  const ruta = path.startsWith(PREFIJO_ESPACIOS_BFF) ? path.slice(PREFIJO_ESPACIOS_BFF.length) : path;
+
+  const idReservasMatch = /^\/?(?:espacios\/)?(\d+)\/reservas\/?$/.exec(ruta);
+  if (idReservasMatch) {
+    if (body && typeof body === 'object') {
+      (body as Record<string, unknown>).espacio_id = Number.parseInt(idReservasMatch[1], 10);
+    }
+    return '/reservas/';
+  }
+  return normalizarRutaEspacios(ruta);
+}
+
+/** Antepone /espacios a rutas sin recurso conocido y agrega el slash final que exige FastAPI. */
+export function normalizarRutaEspacios(ruta: string): string {
+  if (ruta === '' || ruta === '/' || ruta === '/espacios') return '/espacios/';
+  if (ruta === '/reservas') return '/reservas/';
+  const recursoConocido = ['/espacios', '/reservas', '/health'].some((p) => ruta.startsWith(p));
+  if (recursoConocido) return ruta;
+  return ruta.startsWith('/') ? `/espacios${ruta}` : `/espacios/${ruta}`;
+}
 
 /**
  * Servicio de reenvío (reverse proxy) del BFF hacia los microservicios.
@@ -65,7 +97,7 @@ export class ProxyService {
     path: string,
     query: string,
     body?: unknown,
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const fallbackUrl = this.config.get<string>('gastosComunesUrl') ?? 'http://localhost:8083';
@@ -99,47 +131,18 @@ export class ProxyService {
     path: string,
     query: string,
     body?: unknown,
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const fallbackUrl =
       this.config.get<string>('espaciosComunesUrl') ?? 'http://localhost:8082';
     let baseUrl = await this.eureka.resolveServiceUrl('MS-ESPACIOS-COMUNES', fallbackUrl);
-    baseUrl = baseUrl.replace(/\/+$/, '');
+    baseUrl = stripTrailingSlashes(baseUrl);
     if (!baseUrl.endsWith('/api/v1')) {
       baseUrl = `${baseUrl}/api/v1`;
     }
 
-    let targetPath = path;
-    if (targetPath.startsWith('/api/v1/espacios-comunes')) {
-      targetPath = targetPath.slice('/api/v1/espacios-comunes'.length);
-    }
-
-    // Soporte para ruta RESTful /:id/reservas (especificada en api_gateway.tf / mvp.md)
-    const idReservasMatch = targetPath.match(/^\/?(?:espacios\/)?(\d+)\/reservas\/?$/);
-    if (idReservasMatch) {
-      targetPath = '/reservas/';
-      const espacioId = parseInt(idReservasMatch[1], 10);
-      if (body && typeof body === 'object') {
-        (body as Record<string, unknown>).espacio_id = espacioId;
-      }
-    }
-
-    if (
-      !targetPath.startsWith('/espacios') &&
-      !targetPath.startsWith('/reservas') &&
-      !targetPath.startsWith('/health')
-    ) {
-      if (targetPath === '' || targetPath === '/') {
-        targetPath = '/espacios/';
-      } else {
-        targetPath = `/espacios${targetPath.startsWith('/') ? targetPath : `/${targetPath}`}`;
-      }
-    } else if (targetPath === '/espacios') {
-      targetPath = '/espacios/';
-    } else if (targetPath === '/reservas') {
-      targetPath = '/reservas/';
-    }
+    const targetPath = resolverRutaEspacios(path, body);
 
     const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
@@ -167,7 +170,7 @@ export class ProxyService {
    * queda reportado en `errores` en vez de tumbar el endpoint completo.
    */
   async obtenerPanel(
-    headers: Record<string, string | string[] | undefined>,
+    headers: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
     const errores: string[] = [];
@@ -214,7 +217,7 @@ export class ProxyService {
    * Inyecta identidad del usuario autenticado (x-usuario-sub y x-usuario-roles).
    */
   private buildForwardHeaders(
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Record<string, string> {
     const forward: Record<string, string> = {};

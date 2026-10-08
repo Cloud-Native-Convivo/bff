@@ -10,15 +10,20 @@ import type { Rol, UsuarioAutenticado } from '../common/interfaces/usuario-auten
  * (CLAIM_DE_ROL, CLAIM_SEPARADOR y CLAIM_MAPEO) porque todavía no está
  * definido el claim/App Role final de Entra ID.
  */
+/** Claim de texto o '' si viene ausente o con otro tipo (los claims estándar de JWT son string). */
+function claimTexto(valor: unknown): string {
+  return typeof valor === 'string' ? valor : '';
+}
+
 @Injectable()
 export class IdentityMapper {
   constructor(private readonly config: ConfigService) {}
 
   toUsuario(payload: Record<string, unknown>): UsuarioAutenticado {
-    const sub = String(payload.sub ?? payload.oid ?? '');
+    const sub = claimTexto(payload.sub ?? payload.oid);
     return {
       sub,
-      oid: payload.oid ? String(payload.oid) : sub,
+      oid: claimTexto(payload.oid) || sub,
       name: typeof payload.name === 'string' ? payload.name : undefined,
       preferredUsername:
         typeof payload.preferred_username === 'string'
@@ -32,16 +37,8 @@ export class IdentityMapper {
   }
 
   toUsuarioCognito(payload: Record<string, unknown>): UsuarioAutenticado {
-    const sub = String(payload.sub ?? '');
-    const name =
-      typeof payload.name === 'string'
-        ? payload.name
-        : typeof payload.given_name === 'string'
-          ? payload.given_name
-          : undefined;
-    // El access token de Cognito no trae email/name (solo sub, username,
-    // client_id, scope); quedan undefined salvo que un trigger Pre Token
-    // Generation los agregue. La identidad para ownership es `sub`.
+    const sub = claimTexto(payload.sub);
+    const name = claimTexto(payload.name) || claimTexto(payload.given_name) || undefined;
     const correo =
       typeof payload.email === 'string' ? payload.email : undefined;
     const username =
@@ -65,11 +62,12 @@ export class IdentityMapper {
     const mapeo = this.config.get<Record<string, string>>('claimMap') ?? {};
     const raw = payload[claim ?? 'roles'];
 
-    const valores = Array.isArray(raw)
-      ? (raw as unknown[]).map(String)
-      : typeof raw === 'string'
-        ? raw.split(separador ?? ',')
-        : [];
+    let valores: string[] = [];
+    if (Array.isArray(raw)) {
+      valores = raw.filter((v): v is string => typeof v === 'string');
+    } else if (typeof raw === 'string') {
+      valores = raw.split(separador ?? ',');
+    }
 
     const roles = valores
       .map((v) => mapeo[v] ?? v)
