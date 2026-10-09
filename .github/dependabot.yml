@@ -33,6 +33,9 @@ updates:
           - "eslint*"
           - "prettier*"
           - "typescript*"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # Actions de GitHub (versiones fijadas por SHA)
   - package-ecosystem: github-actions
@@ -75,3 +78,6 @@ updates:
       docker-base:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

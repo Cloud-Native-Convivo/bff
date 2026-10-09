@@ -33,3 +33,6 @@ npm-debug.log*
 # Config local de agentes de código
 .agents/
 .claude/
+
+# Graphify
+graphify-out/

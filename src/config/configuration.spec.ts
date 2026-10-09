@@ -8,7 +8,12 @@ describe('configuration', () => {
   });
 
   function conEntorno(env: Record<string, string | undefined>) {
-    process.env = { ...env } as NodeJS.ProcessEnv;
+    process.env = {
+      ENTRA_TENANT_ID: 'mock-tenant',
+      ENTRA_API_CLIENT_ID: env.ENTRA_AUDIENCE ? undefined : 'mock-client',
+      COGNITO_APP_CLIENT_ID: 'mock-cognito-client',
+      ...env,
+    } as NodeJS.ProcessEnv;
     return configuration();
   }
 
@@ -20,9 +25,15 @@ describe('configuration', () => {
     expect(c.claimMap).toEqual({});
     expect(c.rabbitmqEnabled).toBe(false);
     expect(c.proxyTimeoutMs).toBe(2000);
-    expect(c.cognitoIssuer).toBe('https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jmLnvOaUx');
+    expect(c.cognitoIssuer).toBe('https://cognito-idp.us-east-1.amazonaws.com/');
     expect(c.cognitoJwksUri).toBe(`${c.cognitoIssuer}/.well-known/jwks.json`);
     expect(c.eurekaUrl).toBe('http://admin:admin123@localhost:8761/eureka');
+  });
+
+  it('ENTRA_ISSUER/ENTRA_JWKS_URI vacías (docker-compose) caen al tenant', () => {
+    const c = conEntorno({ ENTRA_TENANT_ID: 'tid', ENTRA_ISSUER: '', ENTRA_JWKS_URI: '' });
+    expect(c.entratIssuer).toBe('https://login.microsoftonline.com/tid/v2.0');
+    expect(c.entratJwksUri).toBe('https://login.microsoftonline.com/tid/discovery/v2.0/keys');
   });
 
   it('lee variables explícitas, listas y mapeo de claims', () => {

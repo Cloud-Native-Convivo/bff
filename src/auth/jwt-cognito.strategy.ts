@@ -24,7 +24,7 @@ export class JwtCognitoStrategy extends PassportStrategy(Strategy, 'jwt-cognito'
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
-        jwksRequestsPerMinute: 5,
+        jwksRequestsPerMinute: 50,
         jwksUri,
       }),
       issuer,

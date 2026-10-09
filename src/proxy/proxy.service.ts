@@ -50,6 +50,7 @@ export function normalizarRutaEspacios(ruta: string): string {
 export class ProxyService {
   private readonly gastosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
   private readonly espaciosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
+  private readonly condominiosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
 
   constructor(
     private readonly http: HttpService,
@@ -82,6 +83,10 @@ export class ProxyService {
     this.espaciosBreaker = new CircuitBreaker(doRequest, {
       ...baseOptions,
       name: 'espacios-comunes',
+    });
+    this.condominiosBreaker = new CircuitBreaker(doRequest, {
+      ...baseOptions,
+      name: 'condominios',
     });
   }
 
@@ -164,6 +169,41 @@ export class ProxyService {
   }
 
   /**
+   * Reenvía la solicitud del cliente a la URL base del microservicio
+   * de Condominios, conservando path, query, método HTTP y los headers
+   * relevantes (Autorización, Content-Type y correlación).
+   */
+  async forwardCondominios(
+    method: string,
+    path: string,
+    query: string,
+    body?: unknown,
+    headers?: HeadersEntrantes,
+    user?: UsuarioAutenticado,
+  ): Promise<unknown> {
+    const fallbackUrl = this.config.get<string>('condominiosUrl') ?? 'http://localhost:8084';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-CONDOMINIOS', fallbackUrl);
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
+    const suffix = query ? `?${query}` : '';
+    // ms-condominios usa /condominios como prefijo
+    const url = `${baseUrl}/condominios${path}${suffix}`;
+
+    try {
+      const { data } = (await this.condominiosBreaker.fire({
+        method,
+        url,
+        data: body,
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
+
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'condominios');
+    }
+  }
+
+  /**
    * Agrega reservas (Espacios Comunes) y gastos comunes del usuario actual
    * para el panel del residente (RF-T.7). Cada llamada downstream se
    * aísla: si un microservicio falla, el otro igual responde y el error
@@ -236,12 +276,10 @@ export class ProxyService {
     forward[CORRELATION_HEADER] =
       asString(source[CORRELATION_HEADER]) ?? newCorrelationId();
 
-    forward['x-usuario-sub'] =
-      user?.sub ?? asString(source['x-usuario-sub']) ?? 'anonimo';
-    forward['x-usuario-roles'] =
-      user?.roles && user.roles.length > 0
-        ? user.roles.join(',')
-        : (asString(source['x-usuario-roles']) ?? '');
+    // Identidad solo desde el JWT validado: los x-usuario-* que mande el
+    // cliente se descartan (los microservicios confían en estos headers).
+    forward['x-usuario-sub'] = user?.sub || 'anonimo';
+    forward['x-usuario-roles'] = user?.roles?.join(',') ?? '';
 
     return forward;
   }

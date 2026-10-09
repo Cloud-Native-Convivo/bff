@@ -93,6 +93,17 @@ describe('ProxyService: gastos, panel y headers', () => {
     });
   });
 
+  it('descarta x-usuario-* enviados por el cliente (anti-spoofing)', async () => {
+    const spoof = { 'x-usuario-sub': 'otro', 'x-usuario-roles': 'administrador' };
+    await proxy.forwardGastos('GET', '/x', '', undefined, spoof);
+    await proxy.forwardGastos('GET', '/x', '', undefined, spoof, { ...usuario, roles: [] });
+    const [anon, sinRol] = request.mock.calls.map((c) => c[0].headers);
+    expect(anon['x-usuario-sub']).toBe('anonimo');
+    expect(anon['x-usuario-roles']).toBe('');
+    expect(sinRol['x-usuario-sub']).toBe('u-1');
+    expect(sinRol['x-usuario-roles']).toBe('');
+  });
+
   it('genera correlación si falta y marca anónimo sin usuario', async () => {
     await proxy.forwardGastos('GET', '/x', '');
     const headers = request.mock.calls[0][0].headers;
