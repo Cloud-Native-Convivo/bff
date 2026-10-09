@@ -35,7 +35,14 @@ describe('IdentityMapper', () => {
     const u = mapper().toUsuarioCognito({ sub: 'c-1', given_name: 'Ana', email: 'a@b.cl' });
     expect(u.name).toBe('Ana');
     expect(u.correo).toBe('a@b.cl');
+    expect(u.preferredUsername).toBe('a@b.cl');
     expect(u.roles).toEqual(['residente']);
     expect(mapper().toUsuarioCognito({ sub: { raro: true } }).sub).toBe('');
+  });
+
+  it('Cognito: usa username como preferredUsername si correo no viene en el token', () => {
+    const u = mapper().toUsuarioCognito({ sub: 'c-1', username: 'ana.cognito' });
+    expect(u.preferredUsername).toBe('ana.cognito');
+    expect(u.correo).toBeUndefined();
   });
 });
