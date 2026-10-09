@@ -41,12 +41,14 @@ export class IdentityMapper {
     const name = claimTexto(payload.name) || claimTexto(payload.given_name) || undefined;
     const correo =
       typeof payload.email === 'string' ? payload.email : undefined;
+    const username =
+      typeof payload.username === 'string' ? payload.username : undefined;
 
     return {
       sub,
       oid: sub,
       name,
-      preferredUsername: correo,
+      preferredUsername: correo ?? username,
       correo,
       claims: { ...payload },
       roles: ['residente'],
