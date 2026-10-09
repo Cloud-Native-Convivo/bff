@@ -15,6 +15,17 @@ function claimTexto(valor: unknown): string {
   return typeof valor === 'string' ? valor : '';
 }
 
+function esRol(v: string): v is Rol {
+  return (
+    v === 'residente' ||
+    v === 'propietario' ||
+    v === 'admin' ||
+    v === 'administrador' ||
+    v === 'conserje' ||
+    v === 'comite'
+  );
+}
+
 @Injectable()
 export class IdentityMapper {
   constructor(private readonly config: ConfigService) {}
@@ -71,14 +82,7 @@ export class IdentityMapper {
 
     const roles = valores
       .map((v) => mapeo[v] ?? v)
-      .filter((v): v is Rol =>
-        v === 'residente' ||
-        v === 'propietario' ||
-        v === 'admin' ||
-        v === 'administrador' ||
-        v === 'conserje' ||
-        v === 'comite',
-      )
+      .filter(esRol)
       .map((v) => (v === 'admin' ? 'administrador' : v));
 
     const rolesUnicos = [...new Set(roles)];
@@ -86,9 +90,9 @@ export class IdentityMapper {
       return rolesUnicos;
     }
 
-    // Principio de mínimo privilegio (PoLP / OWASP A01):
-    // Si el usuario autenticado en Entra ID no tiene ningún App Role asignado
-    // en el tenant, no asume privilegios administrativos por defecto.
-    return [];
+    // Principio de mínimo privilegio (PoLP / OWASP A01): un usuario de
+    // Entra ID sin App Role asignado cae al rol de menor privilegio,
+    // igual que Cognito. Nunca se eleva por configuración ni por headers.
+    return ['residente'];
   }
 }

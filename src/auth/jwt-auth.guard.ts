@@ -59,8 +59,6 @@ export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
     return isObservable(res) ? await firstValueFrom(res) : await res;
   }
 
-  // DEBUG temporal: diagnostico del 401 "sesion expirada/invalida" -- Passport
-  // no loguea por que rechazo el JWT (firma/issuer/audience/exp).
   handleRequest<TUser = unknown>(
     err: unknown,
     user: TUser,
@@ -69,11 +67,21 @@ export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
     status?: unknown,
   ): TUser {
     if (err || !user) {
-      const detalle = info as { message?: string; name?: string } | undefined;
-      console.error('DEBUG JwtAuthGuard reject:', {
+      const req = context.switchToHttp().getRequest<Request>();
+      const authHeader = req.headers?.authorization;
+      console.error('DEBUG Auth failure details:', {
+        url: req.url,
+        hasAuthorizationHeader: Boolean(authHeader),
+        authHeaderPrefix: authHeader ? authHeader.slice(0, 20) : 'NONE',
         err: err instanceof Error ? err.message : err,
-        infoName: detalle?.name,
-        infoMessage: detalle?.message ?? String(info),
+        infoType: typeof info,
+        infoMessage: (info as any)?.message,
+        infoErrors: (info as any)?.errors?.map((e: any) => ({
+          name: e?.name,
+          message: e?.message,
+          stack: e?.stack?.slice(0, 150),
+        })),
+        rawInfo: info,
       });
     }
     return super.handleRequest(err, user, info, context, status);

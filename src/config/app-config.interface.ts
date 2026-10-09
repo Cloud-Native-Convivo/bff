@@ -17,6 +17,7 @@ export interface AppConfig {
   claimMap: Record<string, string>;
   gastosComunesUrl: string;
   espaciosComunesUrl: string;
+  condominiosUrl: string;
   proxyTimeoutMs: number;
   eurekaUrl: string;
   rabbitmqEnabled: boolean;

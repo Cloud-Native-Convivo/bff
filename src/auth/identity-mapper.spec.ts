@@ -27,8 +27,10 @@ describe('IdentityMapper', () => {
     expect(u.roles).toContain('residente');
   });
 
-  it('Entra ID: claim de rol ausente o con otro tipo da lista vacía', () => {
-    expect(mapper().toUsuario({ sub: 's', roles: { x: 1 } }).roles).toEqual([]);
+  it('Entra ID: sin rol válido cae a residente (mínimo privilegio)', () => {
+    expect(mapper().toUsuario({ sub: 's', roles: { x: 1 } }).roles).toEqual(['residente']);
+    expect(mapper().toUsuario({ sub: 's' }).roles).toEqual(['residente']);
+    expect(mapper().toUsuario({ sub: 's', roles: ['root'] }).roles).toEqual(['residente']);
   });
 
   it('Cognito: name cae a given_name y el rol es siempre residente', () => {

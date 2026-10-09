@@ -30,6 +30,11 @@ describe('RolesGuard', () => {
     expect(() => guard(['administrador']).canActivate(contexto(req))).toThrow(ForbiddenException);
   });
 
+  it('ignora X-Usuario-Roles del cliente (anti-spoofing)', () => {
+    const req = { user: { roles: [] }, headers: { 'x-usuario-roles': 'administrador' } };
+    expect(() => guard(['administrador']).canActivate(contexto(req))).toThrow(ForbiddenException);
+  });
+
   it('rechaza si no hay usuario ni headers', () => {
     expect(() => guard(['residente']).canActivate(contexto({}))).toThrow(ForbiddenException);
   });

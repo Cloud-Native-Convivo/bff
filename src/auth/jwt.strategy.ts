@@ -1,3 +1,4 @@
+import { Agent } from 'node:https';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -35,8 +36,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
-        jwksRequestsPerMinute: 5,
+        jwksRequestsPerMinute: 50,
         jwksUri,
+        // ponytail: musl (node:24-alpine) pierde los registros A de
+        // login.microsoftonline.com con AF_UNSPEC y Node solo ve IPv6, sin ruta
+        // en Docker (ENETUNREACH). Forzar IPv4; quitar si la imagen pasa a glibc.
+        requestAgent: jwksUri.startsWith('https:') ? new Agent({ family: 4 }) : undefined,
       }),
       issuer: issuers,
       audience: audiences,
