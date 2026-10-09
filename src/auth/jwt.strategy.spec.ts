@@ -43,16 +43,27 @@ describe('JwtStrategy (Entra ID)', () => {
 describe('JwtCognitoStrategy', () => {
   const estrategia = new JwtCognitoStrategy(config, mapper);
 
-  it('acepta token del client_id configurado (aud o client_id)', async () => {
-    await expect(estrategia.validate({ sub: 'c-1', aud: 'app-cliente' })).resolves.toMatchObject({
+  it('acepta access token del client_id configurado', async () => {
+    await expect(
+      estrategia.validate({ sub: 'c-1', token_use: 'access', client_id: 'app-cliente' }),
+    ).resolves.toMatchObject({
       sub: 'c-1',
       roles: ['residente'],
     });
-    await expect(estrategia.validate({ sub: 'c-1', client_id: 'app-cliente' })).resolves.toBeDefined();
   });
 
-  it('rechaza token de otro cliente o sin sub', async () => {
-    await expect(estrategia.validate({ sub: 'c-1', aud: 'otro' })).rejects.toThrow(UnauthorizedException);
-    await expect(estrategia.validate({ aud: 'app-cliente' })).rejects.toThrow(UnauthorizedException);
+  it('rechaza ID token, otro cliente o payload sin sub', async () => {
+    await expect(
+      estrategia.validate({ sub: 'c-1', token_use: 'id', aud: 'app-cliente' }),
+    ).rejects.toThrow(UnauthorizedException);
+    await expect(
+      estrategia.validate({ sub: 'c-1', client_id: 'app-cliente' }),
+    ).rejects.toThrow(UnauthorizedException);
+    await expect(
+      estrategia.validate({ sub: 'c-1', token_use: 'access', client_id: 'otro' }),
+    ).rejects.toThrow(UnauthorizedException);
+    await expect(
+      estrategia.validate({ token_use: 'access', client_id: 'app-cliente' }),
+    ).rejects.toThrow(UnauthorizedException);
   });
 });
