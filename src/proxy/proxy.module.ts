@@ -7,11 +7,18 @@ import { PanelController } from './panel.controller';
 import { ProxyService } from './proxy.service';
 import { EurekaDiscoveryService } from './eureka-discovery.service';
 
+import { JobsProxyController } from './jobs-proxy.controller';
 import { AsyncMutationService } from './async-mutation.service';
 
 @Module({
   imports: [HttpModule],
-  controllers: [GastosProxyController, EspaciosProxyController, CondominiosProxyController, PanelController],
+  controllers: [
+    GastosProxyController,
+    EspaciosProxyController,
+    CondominiosProxyController,
+    PanelController,
+    JobsProxyController,
+  ],
   providers: [ProxyService, EurekaDiscoveryService, AsyncMutationService],
   exports: [EurekaDiscoveryService, AsyncMutationService],
 })
