@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { MessageBroker } from './message-broker.interface';
+import type { ComandoMutacion } from './comando-mutacion.interface';
 
 /**
  * Servicio de mensajería y nivelación de carga (Queue-based Load Leveling).
@@ -106,6 +107,13 @@ export class MessagingService
     } catch (error) {
       this.logger.error(`Error enviando mensaje a cola ${queue}: ${String(error)}`);
     }
+  }
+
+  async encolarComando(
+    queue: string,
+    comando: ComandoMutacion,
+  ): Promise<void> {
+    await this.sendToQueue(queue, JSON.stringify(comando));
   }
 
   private async conectar(): Promise<void> {

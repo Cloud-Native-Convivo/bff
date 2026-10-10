@@ -1,6 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import { MessagingService } from './messaging.service';
+import type { ComandoMutacion } from './comando-mutacion.interface';
 
 jest.mock('amqplib', () => ({ connect: jest.fn() }));
 const connect = amqp.connect as unknown as jest.Mock;
@@ -79,6 +80,28 @@ describe('MessagingService', () => {
       'cola',
       Buffer.from('hola'),
       expect.objectContaining({ priority: 5 }),
+    );
+  });
+
+  it('debe encolar un comando de mutacion en la cola duradera correspondiente', async () => {
+    const { s, canal } = await conectado();
+    const comando: ComandoMutacion = {
+      ticket_id: 'test-ticket-123',
+      modulo: 'ESPACIOS',
+      accion: 'CREAR_RESERVA',
+      usuario_id: 'user-1',
+      rol: 'residente',
+      path: '/reservas/',
+      metodo: 'POST',
+      payload: { espacio_id: 1 },
+      timestamp: '2026-10-09T22:00:00.000Z',
+    };
+    await s.encolarComando('espacios_comandos_queue', comando);
+    expect(canal.assertQueue).toHaveBeenCalledWith('espacios_comandos_queue', { durable: true });
+    expect(canal.sendToQueue).toHaveBeenCalledWith(
+      'espacios_comandos_queue',
+      Buffer.from(JSON.stringify(comando)),
+      expect.objectContaining({ persistent: true, contentType: 'application/json' }),
     );
   });
 
