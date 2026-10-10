@@ -126,6 +126,31 @@ export class ProxyService {
     }
   }
 
+  async forwardGastosBinary(
+    path: string,
+    headers?: HeadersEntrantes,
+    user?: UsuarioAutenticado,
+  ): Promise<{ data: Buffer; headers: Record<string, string> }> {
+    const fallbackUrl = this.config.get<string>('gastosComunesUrl') ?? 'http://localhost:8083';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-GASTOS-COMUNES', fallbackUrl);
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 5000;
+    const url = `${baseUrl}${path}`;
+
+    try {
+      const response = (await this.gastosBreaker.fire({
+        method: 'GET',
+        url,
+        responseType: 'arraybuffer',
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: ArrayBuffer; headers: Record<string, string> };
+
+      return { data: Buffer.from(response.data), headers: response.headers };
+    } catch (error) {
+      throw this.toServiceError(error, 'gastos-comunes');
+    }
+  }
+
   /**
    * Reenvía la solicitud del cliente a la URL base del microservicio
    * de Espacios Comunes, conservando path, query, método HTTP y los headers
