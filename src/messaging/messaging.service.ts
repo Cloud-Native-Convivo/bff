@@ -81,6 +81,33 @@ export class MessagingService
     }
   }
 
+  async publishFanout(
+    exchange: string,
+    payload: unknown,
+  ): Promise<void> {
+    if (!this.isReady()) {
+      this.logger.warn(
+        `publishFanout buffering/fallback (RabbitMQ no conectado aún): ${exchange}`,
+        typeof payload === 'string' ? payload : JSON.stringify(payload),
+      );
+      return;
+    }
+
+    try {
+      const buffer = Buffer.from(
+        typeof payload === 'string' ? payload : JSON.stringify(payload),
+      );
+      await this.channel!.assertExchange(exchange, 'fanout', { durable: true });
+      this.channel!.publish(exchange, '', buffer, {
+        persistent: true,
+        contentType: 'application/json',
+      });
+      this.logger.debug(`Mensaje publicado en exchange fanout ${exchange}`);
+    } catch (error) {
+      this.logger.error(`Error publicando en exchange fanout ${exchange}: ${String(error)}`);
+    }
+  }
+
   async sendToQueue(
     queue: string,
     payload: unknown,

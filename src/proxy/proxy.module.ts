@@ -9,6 +9,7 @@ import { EurekaDiscoveryService } from './eureka-discovery.service';
 
 import { JobsProxyController } from './jobs-proxy.controller';
 import { AsyncMutationService } from './async-mutation.service';
+import { GastosPdfProxyController } from './gastos-pdf-proxy.controller';
 
 @Module({
   imports: [HttpModule],
@@ -18,6 +19,7 @@ import { AsyncMutationService } from './async-mutation.service';
     CondominiosProxyController,
     PanelController,
     JobsProxyController,
+    GastosPdfProxyController,
   ],
   providers: [ProxyService, EurekaDiscoveryService, AsyncMutationService],
   exports: [EurekaDiscoveryService, AsyncMutationService],
