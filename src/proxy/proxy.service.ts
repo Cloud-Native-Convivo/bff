@@ -17,7 +17,7 @@ const PREFIJO_ESPACIOS_BFF = '/api/v1/espacios-comunes';
 
 /**
  * Traduce la ruta pública del BFF a la ruta del microservicio de Espacios
- * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf / mvp.md) se
+ * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf / ERS.md) se
  * reescribe a /reservas/ inyectando espacio_id en el body.
  */
 export function resolverRutaEspacios(path: string, body?: unknown): string {

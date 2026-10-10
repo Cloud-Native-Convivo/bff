@@ -1,10 +1,11 @@
 import type { ConfigService } from '@nestjs/config';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { HealthController } from '../health/health.controller';
 import { EspaciosProxyController } from './espacios-proxy.controller';
 import { GastosProxyController } from './gastos-proxy.controller';
 import { PanelController } from './panel.controller';
 import type { ProxyService } from './proxy.service';
+import type { AsyncMutationService } from './async-mutation.service';
 
 const usuario = { sub: 'u-1', oid: 'u-1', roles: ['residente' as const], claims: {} };
 
@@ -20,11 +21,40 @@ function proxyFalso() {
   };
 }
 
+function asyncMutationFalso() {
+  return {
+    despachar: jest.fn().mockResolvedValue({
+      ticket_id: 'ticket-123',
+      estado: 'EN_COLA',
+      status_url: '/api/v1/espacios-comunes/jobs/ticket-123',
+      creado_en: '2026-10-09T22:00:00Z',
+    }),
+  };
+}
+
+function resFalso() {
+  const headers: Record<string, string> = {};
+  return {
+    status: jest.fn().mockReturnThis(),
+    setHeader: jest.fn((k: string, v: string) => {
+      headers[k] = v;
+    }),
+    headers,
+  } as unknown as Response;
+}
+
 describe('EspaciosProxyController', () => {
   const proxy = proxyFalso();
-  const controller = new EspaciosProxyController(proxy as unknown as ProxyService);
+  const asyncMut = asyncMutationFalso();
+  const controller = new EspaciosProxyController(
+    proxy as unknown as ProxyService,
+    asyncMut as unknown as AsyncMutationService,
+  );
 
-  beforeEach(() => proxy.forwardEspacios.mockClear());
+  beforeEach(() => {
+    proxy.forwardEspacios.mockClear();
+    asyncMut.despachar.mockClear();
+  });
 
   it('quita el prefijo v1 y separa la query', async () => {
     await expect(controller.listar(req('GET', '/api/v1/espacios-comunes/espacios/2?x=1'), usuario)).resolves.toBe(
@@ -56,18 +86,28 @@ describe('EspaciosProxyController', () => {
     'actualizarEspacio',
     'modificarEspacio',
     'eliminarEspacio',
-  ] as const)('%s reenvía método, body y usuario', async (handler) => {
+  ] as const)('%s despacha mutacion asincrona con 202 Accepted', async (handler) => {
     const body = { a: 1 };
-    await controller[handler](req('POST', '/api/v1/espacios-comunes/reservas', body), usuario);
-    expect(proxy.forwardEspacios).toHaveBeenCalledWith('POST', '/reservas', '', body, expect.anything(), usuario);
+    const res = resFalso();
+    const r = req('POST', '/api/v1/espacios-comunes/reservas', body);
+    const resultado = await controller[handler](r, res as unknown as Response, usuario);
+    expect(resultado).toMatchObject({ ticket_id: 'ticket-123', estado: 'EN_COLA' });
+    expect(asyncMut.despachar).toHaveBeenCalledWith('ESPACIOS', expect.any(String), r, usuario);
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.setHeader).toHaveBeenCalledWith('Location', '/api/v1/espacios-comunes/jobs/ticket-123');
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '2');
   });
 });
 
 describe('GastosProxyController', () => {
   const proxy = proxyFalso();
-  const controller = new GastosProxyController(proxy as unknown as ProxyService);
+  const asyncMut = asyncMutationFalso();
+  const controller = new GastosProxyController(
+    proxy as unknown as ProxyService,
+    asyncMut as unknown as AsyncMutationService,
+  );
 
-  it('quita /api/gastos y reenvía con query', async () => {
+  it('quita /api/gastos y reenvía con query en GET', async () => {
     await expect(controller.listar(req('GET', '/api/gastos/api/v1/gastos-comunes?page=1'), usuario)).resolves.toBe(
       'ok-gastos',
     );
@@ -79,6 +119,15 @@ describe('GastosProxyController', () => {
       expect.anything(),
       usuario,
     );
+  });
+
+  it('despacha mutaciones no-GET hacia asyncMutation con 202 Accepted', async () => {
+    const res = resFalso();
+    const r = req('POST', '/api/gastos/api/v1/gastos-comunes', { monto: 50000 });
+    const resultado = await controller.forward(r, res as unknown as Response, usuario);
+    expect(resultado).toMatchObject({ ticket_id: 'ticket-123', estado: 'EN_COLA' });
+    expect(asyncMut.despachar).toHaveBeenCalledWith('GASTOS', 'POST_GASTO', r, usuario);
+    expect(res.status).toHaveBeenCalledWith(202);
   });
 });
 
