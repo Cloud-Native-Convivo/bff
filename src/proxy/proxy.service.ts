@@ -306,6 +306,14 @@ export class ProxyService {
     forward['x-usuario-sub'] = user?.sub || 'anonimo';
     forward['x-usuario-roles'] = user?.roles?.join(',') ?? '';
 
+    const unidadId =
+      (user?.claims?.['unidad_id'] as string) ??
+      (user?.claims?.['custom:unidad'] as string) ??
+      (user?.claims?.['unidad'] as string) ??
+      '301-A';
+    forward['x-usuario-unidad'] = unidadId;
+    forward['x-usuario-unidad-id'] = unidadId;
+
     return forward;
   }
 }

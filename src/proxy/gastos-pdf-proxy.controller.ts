@@ -49,7 +49,9 @@ export class GastosPdfProxyController {
 
     return {
       ticket_id: ticketId,
+      ticketId: ticketId,
       estado: 'PENDIENTE',
+      status: 'PENDIENTE',
       mensaje: 'Generación de comprobante PDF encolada exitosamente',
       download_url: `/api/v1/gastos/pdf/${ticketId}/descargar`,
     };
