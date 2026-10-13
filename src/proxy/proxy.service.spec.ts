@@ -90,6 +90,8 @@ describe('ProxyService: gastos, panel y headers', () => {
       'x-correlation-id': 'corr-1',
       'x-usuario-sub': 'u-1',
       'x-usuario-roles': 'administrador,comite',
+      'x-usuario-unidad': '301-A',
+      'x-usuario-unidad-id': '301-A',
     });
   });
 
