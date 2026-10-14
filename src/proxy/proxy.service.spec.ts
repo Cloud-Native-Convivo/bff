@@ -93,6 +93,24 @@ describe('ProxyService: gastos, panel y headers', () => {
     });
   });
 
+  it('propaga x-usuario-unidad solo si esta presente en claims del usuario', async () => {
+    const usuarioConUnidad = {
+      ...usuario,
+      claims: { unidad_id: '502-C' },
+    };
+    await proxy.forwardGastos(
+      'GET',
+      '/api/v1/gastos-comunes',
+      '',
+      undefined,
+      {},
+      usuarioConUnidad,
+    );
+    const llamada = request.mock.calls[0][0];
+    expect(llamada.headers['x-usuario-unidad']).toBe('502-C');
+    expect(llamada.headers['x-usuario-unidad-id']).toBe('502-C');
+  });
+
   it('descarta x-usuario-* enviados por el cliente (anti-spoofing)', async () => {
     const spoof = { 'x-usuario-sub': 'otro', 'x-usuario-roles': 'administrador' };
     await proxy.forwardGastos('GET', '/x', '', undefined, spoof);

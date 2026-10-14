@@ -11,8 +11,7 @@ const CONDOMINIOS_PREFIX = '/api/condominios';
 export class CondominiosProxyController {
   constructor(private readonly proxy: ProxyService) {}
 
-  @Get()
-  @Get('*path')
+  @Get(['/', '*path'])
   async listar(
     @Req() req: Request,
     @UsuarioActual() user?: UsuarioAutenticado,
@@ -21,8 +20,7 @@ export class CondominiosProxyController {
   }
 
   @Roles('admin', 'administrador', 'conserje', 'comite')
-  @All()
-  @All('*path')
+  @All(['/', '*path'])
   async forward(
     @Req() req: Request,
     @UsuarioActual() user?: UsuarioAutenticado,
