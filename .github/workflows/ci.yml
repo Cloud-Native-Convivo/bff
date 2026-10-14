@@ -76,6 +76,7 @@ jobs:
           load: true
           tags: ${{ env.IMAGE_NAME }}:pr
           cache-from: type=gha
+          cache-to: type=gha,mode=max
       # Primer scan informativo (CRITICAL+HIGH), segundo gate solo CRITICAL
       - name: Trivy resumen
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -87,6 +88,7 @@ jobs:
           output: trivy.txt
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "0"
       - name: Publicar resumen Trivy
         run: |
@@ -105,4 +107,5 @@ jobs:
           format: table
           severity: CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "1"
