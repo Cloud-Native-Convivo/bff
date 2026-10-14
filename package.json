@@ -59,7 +59,7 @@
     "@nestjs/testing": "^12.1.2",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.19.0",
+    "@types/node": "^26.6.4",
     "@types/opossum": "^8.1.9",
     "@types/passport-jwt": "^4.0.1",
     "eslint": "^10.12.0",
