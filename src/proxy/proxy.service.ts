@@ -237,12 +237,18 @@ export class ProxyService {
   async obtenerPanel(
     headers: HeadersEntrantes,
     user?: UsuarioAutenticado,
+    condominioId?: string,
   ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
     const errores: string[] = [];
 
     // forwardGastos no reescribe el path (a diferencia de forwardEspacios):
     // hay que pasarle la ruta real del microservicio (@RequestMapping de
-    // GastoComunController), no un alias corto.
+    // GastoComunController), no un alias corto. GastoComunController exige
+    // condominioId como query param obligatorio -- sin esto, Spring responde
+    // 400/500 y el circuit breaker lo cuenta como falla (abre y esconde el
+    // error real detrás de un 503 para todo el resto de llamadas).
+    const gastosQuery = condominioId ? `condominioId=${encodeURIComponent(condominioId)}` : '';
+
     const [reservas, gastos] = await Promise.all([
       this.forwardEspacios('GET', '/reservas', '', undefined, headers, user).catch(
         (error) => {
@@ -250,7 +256,7 @@ export class ProxyService {
           return null;
         },
       ),
-      this.forwardGastos('GET', '/api/v1/gastos-comunes', '', undefined, headers, user).catch(
+      this.forwardGastos('GET', '/api/v1/gastos-comunes', gastosQuery, undefined, headers, user).catch(
         (error) => {
           errores.push(`gastos-comunes: ${extractErrorMessage(error)}`);
           return null;
