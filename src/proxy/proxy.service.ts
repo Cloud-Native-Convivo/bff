@@ -309,10 +309,11 @@ export class ProxyService {
     const unidadId =
       (user?.claims?.['unidad_id'] as string) ??
       (user?.claims?.['custom:unidad'] as string) ??
-      (user?.claims?.['unidad'] as string) ??
-      '301-A';
-    forward['x-usuario-unidad'] = unidadId;
-    forward['x-usuario-unidad-id'] = unidadId;
+      (user?.claims?.['unidad'] as string);
+    if (unidadId) {
+      forward['x-usuario-unidad'] = unidadId;
+      forward['x-usuario-unidad-id'] = unidadId;
+    }
 
     return forward;
   }
