@@ -73,6 +73,7 @@ jobs:
           severity: CRITICAL,HIGH
           limit-severities-for-sarif: true
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "0"
 
       - name: Subir SARIF a Code Scanning
@@ -91,6 +92,7 @@ jobs:
           format: table
           severity: CRITICAL
           ignore-unfixed: true
+          trivyignores: .trivyignore
           exit-code: "1"
 
       - name: Build and push Docker image

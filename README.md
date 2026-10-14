@@ -132,3 +132,25 @@ Todos los errores se devuelven en formato uniforme vía el filtro global:
   credenciales en el repositorio ni conexiones reales activas.
 - El BFF propaga hacia Gastos Comunes los headers `Authorization`,
   `Content-Type` y `X-Correlation-Id` (generado si el cliente no lo envía).
+
+## Prevención de fallos en CI y protocolo de PRs
+
+Para evitar rechazos o fallos en GitHub Actions:
+
+### 1. Verificación local pre-push
+```bash
+npm test
+```
+Ejecuta la suite completa de 15 suites de pruebas en Jest, incluyendo validación de filtros, proxies, circuit breaker, autenticación y convención de commits.
+
+### 2. Formato estricto de PRs (Gitmoji)
+`pr-quality.yml` valida que los títulos de PR comiencen con Gitmoji y sigan formato convencional (`^(?::\w+:|[^\w\s:]\S*)\s(\w*)(?:\(([\w$.\-*/ ]*)\))?!?:\s(.*)$`).
+
+Ejemplos:
+- `:sparkles: feat(proxy): circuit breaker con opossum`
+- `:lock: fix(auth): aud claim dual validado`
+- `:memo: docs(readme): documentar verificacion local`
+
+### 3. Excepciones temporales de Trivy (`.trivyignore`)
+Si se detecta un CVE `CRITICAL` en la imagen Docker base sin fix upstream, regístralo en `.trivyignore` con expiración y justificación técnica.
+
