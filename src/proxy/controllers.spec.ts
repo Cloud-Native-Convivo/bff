@@ -132,12 +132,12 @@ describe('GastosProxyController', () => {
 });
 
 describe('PanelController', () => {
-  it('delega en obtenerPanel con headers y usuario', async () => {
+  it('delega en obtenerPanel con headers, condominioId y usuario', async () => {
     const proxy = proxyFalso();
     const controller = new PanelController(proxy as unknown as ProxyService);
-    const r = req('GET', '/api/v1/panel');
-    await expect(controller.obtenerPanel(r, usuario)).resolves.toBe('ok-panel');
-    expect(proxy.obtenerPanel).toHaveBeenCalledWith(r.headers, usuario);
+    const r = req('GET', '/api/v1/panel?condominioId=1');
+    await expect(controller.obtenerPanel(r, '1', usuario)).resolves.toBe('ok-panel');
+    expect(proxy.obtenerPanel).toHaveBeenCalledWith(r.headers, usuario, '1');
   });
 });
 
