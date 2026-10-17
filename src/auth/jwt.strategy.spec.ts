@@ -27,11 +27,13 @@ describe('JwtStrategy (Entra ID)', () => {
     await expect(estrategia.validate({ sub: 's-1' })).resolves.toMatchObject({ sub: 's-1' });
   });
 
-  it('rechaza payload sin identificador', async () => {
+  it('rechaza payload sin identificador o vacio', async () => {
     await expect(estrategia.validate({})).rejects.toThrow(UnauthorizedException);
     await expect(estrategia.validate(null as unknown as Record<string, unknown>)).rejects.toThrow(
       UnauthorizedException,
     );
+    await expect(estrategia.validate({ oid: '   ' })).rejects.toThrow(UnauthorizedException);
+    await expect(estrategia.validate({ sub: '' })).rejects.toThrow(UnauthorizedException);
   });
 
   it('sin tenant solo acepta el issuer configurado', () => {
@@ -64,6 +66,9 @@ describe('JwtCognitoStrategy', () => {
     ).rejects.toThrow(UnauthorizedException);
     await expect(
       estrategia.validate({ token_use: 'access', client_id: 'app-cliente' }),
+    ).rejects.toThrow(UnauthorizedException);
+    await expect(
+      estrategia.validate({ sub: '   ', token_use: 'access', client_id: 'app-cliente' }),
     ).rejects.toThrow(UnauthorizedException);
   });
 });

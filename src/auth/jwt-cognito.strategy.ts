@@ -35,7 +35,7 @@ export class JwtCognitoStrategy extends PassportStrategy(Strategy, 'jwt-cognito'
   }
 
   async validate(payload: Record<string, unknown>): Promise<UsuarioAutenticado> {
-    if (!payload || typeof payload.sub !== 'string') {
+    if (!payload || typeof payload.sub !== 'string' || !payload.sub.trim()) {
       throw new UnauthorizedException('Token inválido: falta sub de Cognito');
     }
     // Solo access tokens: el ID token es para que el front sepa quién es el usuario,

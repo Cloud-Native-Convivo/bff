@@ -321,6 +321,14 @@ export class ProxyService {
       forward['x-usuario-unidad-id'] = unidadId;
     }
 
+    const condominioId =
+      (user?.claims?.['condominio_id'] as string | number) ??
+      (user?.claims?.['custom:condominio'] as string | number) ??
+      (user?.claims?.['condominio'] as string | number);
+    if (condominioId !== undefined && condominioId !== null && String(condominioId).trim() !== '') {
+      forward['x-condominio-id'] = String(condominioId).trim();
+    }
+
     return forward;
   }
 }

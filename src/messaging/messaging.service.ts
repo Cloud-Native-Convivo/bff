@@ -48,6 +48,15 @@ export class MessagingService
     await this.cerrarConexion();
   }
 
+  private safeStringify(payload: unknown): string {
+    if (typeof payload === 'string') return payload;
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[Unserializable Payload]';
+    }
+  }
+
   isReady(): boolean {
     return this.connection !== null && this.channel !== null;
   }
@@ -60,15 +69,13 @@ export class MessagingService
     if (!this.isReady()) {
       this.logger.warn(
         `publish buffering/fallback (RabbitMQ no conectado aún): ${exchange}/${routingKey}`,
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
+        this.safeStringify(payload),
       );
       return;
     }
 
     try {
-      const buffer = Buffer.from(
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
-      );
+      const buffer = Buffer.from(this.safeStringify(payload));
       const ex = exchange || this.config.get<string>('rabbitmqExchange') || 'espacios_events';
       await this.channel!.assertExchange(ex, 'topic', { durable: true });
       this.channel!.publish(ex, routingKey, buffer, {
@@ -88,15 +95,13 @@ export class MessagingService
     if (!this.isReady()) {
       this.logger.warn(
         `publishFanout buffering/fallback (RabbitMQ no conectado aún): ${exchange}`,
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
+        this.safeStringify(payload),
       );
       return;
     }
 
     try {
-      const buffer = Buffer.from(
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
-      );
+      const buffer = Buffer.from(this.safeStringify(payload));
       await this.channel!.assertExchange(exchange, 'fanout', { durable: true });
       this.channel!.publish(exchange, '', buffer, {
         persistent: true,
@@ -121,9 +126,7 @@ export class MessagingService
     }
 
     try {
-      const buffer = Buffer.from(
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
-      );
+      const buffer = Buffer.from(this.safeStringify(payload));
       await this.channel!.assertQueue(queue, { durable: true });
       this.channel!.sendToQueue(queue, buffer, {
         persistent: true,

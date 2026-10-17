@@ -147,4 +147,33 @@ describe('MessagingService', () => {
     otro.canal.close.mockRejectedValueOnce(new Error('ya cerrado'));
     await expect(otro.s.onModuleDestroy()).resolves.toBeUndefined();
   });
+
+  it('publishFanout declara exchange fanout y publica mensaje persistente', async () => {
+    const { s, canal } = await conectado();
+    await s.publishFanout('fanout_ex', { evento: 'notificacion' });
+    expect(canal.assertExchange).toHaveBeenCalledWith('fanout_ex', 'fanout', { durable: true });
+    expect(canal.publish).toHaveBeenCalledWith(
+      'fanout_ex',
+      '',
+      Buffer.from('{"evento":"notificacion"}'),
+      expect.objectContaining({ persistent: true, contentType: 'application/json' }),
+    );
+  });
+
+  it('publishFanout no falla cuando RabbitMQ esta deshabilitado o no listo', async () => {
+    const s = servicio({ rabbitmqEnabled: false });
+    await s.onModuleInit();
+    await expect(s.publishFanout('ex_fan', { a: 1 })).resolves.toBeUndefined();
+  });
+
+  it('publish, publishFanout y sendToQueue toleran payloads circulares sin lanzar excepcion no controlada', async () => {
+    const s = servicio({ rabbitmqEnabled: false });
+    await s.onModuleInit();
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    await expect(s.publish('ex', 'rk', circular)).resolves.toBeUndefined();
+    await expect(s.publishFanout('ex_fan', circular)).resolves.toBeUndefined();
+    await expect(s.sendToQueue('q', circular)).resolves.toBeUndefined();
+  });
 });

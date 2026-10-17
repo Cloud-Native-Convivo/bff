@@ -155,4 +155,36 @@ describe('ProxyService: gastos, panel y headers', () => {
     const panel = await aislado.obtenerPanel({});
     expect(panel.errores).toEqual(['espacios-comunes: error desconocido', 'gastos-comunes: error desconocido']);
   });
+
+  it('propaga x-condominio-id verificado desde claims del token (custom:condominio o condominio_id)', async () => {
+    const usuarioConCondominio = {
+      ...usuario,
+      claims: { 'custom:condominio': '15' },
+    };
+    await proxy.forwardGastos('GET', '/api/v1/gastos-comunes', '', undefined, {}, usuarioConCondominio);
+    const llamada = request.mock.calls[0][0];
+    expect(llamada.headers['x-condominio-id']).toBe('15');
+  });
+
+  it('descarta x-condominio-id y x-usuario-condominio inyectados por el cliente si el token no los contiene', async () => {
+    const spoof = {
+      'x-condominio-id': '999',
+      'x-usuario-condominio': 'hack',
+      'x-usuario-roles': 'admin',
+    };
+    await proxy.forwardGastos('GET', '/api/v1/gastos-comunes', '', undefined, spoof, usuario);
+    const llamada = request.mock.calls[0][0];
+    expect(llamada.headers['x-condominio-id']).toBeUndefined();
+    expect(llamada.headers['x-usuario-condominio']).toBeUndefined();
+    expect(llamada.headers['x-usuario-roles']).toBe('administrador,comite');
+  });
+
+  it('forwardCondominios reenvia con URL base resuelta y headers seguros', async () => {
+    (eureka.resolveServiceUrl as jest.Mock).mockResolvedValueOnce('http://ms-condominios:8084');
+    await proxy.forwardCondominios('GET', '/1', '', undefined, { authorization: 'Bearer tok' }, usuario);
+    const llamada = request.mock.calls[0][0];
+    expect(llamada.url).toBe('http://ms-condominios:8084/condominios/1');
+    expect(llamada.headers.authorization).toBe('Bearer tok');
+    expect(llamada.headers['x-usuario-sub']).toBe('u-1');
+  });
 });
