@@ -11,6 +11,7 @@ interface EntradaCache {
 }
 
 const TTL_CACHE_MS = 5 * 60 * 1000;
+const TIMEOUT_GET_USER_MS = 2000;
 
 /**
  * El access token de Cognito nunca trae el claim `email` (solo el ID token
@@ -37,7 +38,9 @@ export class CognitoEmailService {
     }
 
     try {
-      const resultado = await this.cliente.send(new GetUserCommand({ AccessToken: accessToken }));
+      const resultado = await this.conTimeout(
+        this.cliente.send(new GetUserCommand({ AccessToken: accessToken })),
+      );
       const email = resultado.UserAttributes?.find((a) => a.Name === 'email')?.Value;
       if (email) {
         this.cache.set(sub, { email, expiraEn: Date.now() + TTL_CACHE_MS });
@@ -47,5 +50,16 @@ export class CognitoEmailService {
       this.logger.warn(`No se pudo obtener el email de Cognito para sub=${sub}: ${(error as Error).message}`);
       return undefined;
     }
+  }
+
+  private conTimeout<T>(promesa: Promise<T>): Promise<T> {
+    let temporizador: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      temporizador = setTimeout(
+        () => reject(new Error(`Timeout de ${TIMEOUT_GET_USER_MS}ms esperando a Cognito GetUser`)),
+        TIMEOUT_GET_USER_MS,
+      );
+    });
+    return Promise.race([promesa, timeout]).finally(() => clearTimeout(temporizador));
   }
 }

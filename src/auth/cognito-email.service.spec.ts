@@ -47,4 +47,20 @@ describe('CognitoEmailService', () => {
 
     expect(await service.obtenerEmail('token-3', 'sub-3')).toBeUndefined();
   });
+
+  it('si GetUser no responde en 2s, hace timeout, devuelve undefined con warning (la reserva se encola igual)', async () => {
+    jest.useFakeTimers();
+    mockSend.mockReturnValue(new Promise(() => {})); // nunca resuelve
+    const service = new CognitoEmailService(config());
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+
+    const promesaEmail = service.obtenerEmail('token-lento', 'sub-4');
+    await jest.advanceTimersByTimeAsync(2000);
+    const email = await promesaEmail;
+
+    expect(email).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('sub-4'));
+    warnSpy.mockRestore();
+    jest.useRealTimers();
+  });
 });
