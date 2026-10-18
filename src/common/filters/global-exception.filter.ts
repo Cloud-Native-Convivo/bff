@@ -9,7 +9,13 @@ import {
 import { Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { isAxiosError, type AxiosError } from 'axios';
-import type { ErrorResponse } from '../interfaces/error-response';
+
+export interface ErrorResponse {
+  statusCode: number;
+  code: string;
+  message: string;
+  requestId?: string;
+}
 
 interface ErrorClasificado {
   statusCode: number;
