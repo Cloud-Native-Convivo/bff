@@ -50,7 +50,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
   }
 
   async validate(payload: Record<string, unknown>): Promise<UsuarioAutenticado> {
-    if (!payload || (typeof payload.oid !== 'string' && typeof payload.sub !== 'string')) {
+    const id =
+      (typeof payload?.oid === 'string' && payload.oid.trim()) ||
+      (typeof payload?.sub === 'string' && payload.sub.trim());
+    if (!id) {
       throw new UnauthorizedException('Token inválido: falta oid o sub');
     }
     return this.mapper.toUsuario(payload);
