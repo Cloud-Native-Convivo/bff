@@ -4,6 +4,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtCognitoStrategy } from './jwt-cognito.strategy';
 import { IdentityMapper } from './identity-mapper';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { CognitoEmailService } from './cognito-email.service';
 
 @Module({
   imports: [PassportModule],
@@ -12,7 +13,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     JwtCognitoStrategy,
     IdentityMapper,
     JwtAuthGuard,
+    CognitoEmailService,
   ],
-  exports: [IdentityMapper, JwtAuthGuard],
+  exports: [IdentityMapper, JwtAuthGuard, CognitoEmailService],
 })
 export class AuthModule {}
