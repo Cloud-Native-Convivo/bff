@@ -63,4 +63,40 @@ describe('CognitoEmailService', () => {
     warnSpy.mockRestore();
     jest.useRealTimers();
   });
+
+  it('purga las entradas vencidas de la cache en el siguiente guardado', async () => {
+    jest.useFakeTimers();
+    mockSend.mockResolvedValue({ UserAttributes: [{ Name: 'email', Value: 'x@convivo.cl' }] });
+    const service = new CognitoEmailService(config());
+
+    await service.obtenerEmail('t1', 'sub-expirado');
+    jest.advanceTimersByTime(6 * 60 * 1000); // pasa el TTL de 5 minutos
+    await service.obtenerEmail('t2', 'sub-nuevo');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cache = (service as any).cache as Map<string, unknown>;
+    expect(cache.has('sub-expirado')).toBe(false);
+    expect(cache.has('sub-nuevo')).toBe(true);
+    jest.useRealTimers();
+  });
+
+  it('limita la cache a un maximo de entradas, descartando la mas antigua al llenarse', async () => {
+    mockSend.mockImplementation(async (comando: { AccessToken: string }) => ({
+      UserAttributes: [{ Name: 'email', Value: `${comando.AccessToken}@convivo.cl` }],
+    }));
+    const service = new CognitoEmailService(config());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cache = (service as any).cache as Map<string, unknown>;
+
+    for (let i = 0; i < 1000; i++) {
+      await service.obtenerEmail(`token-${i}`, `sub-${i}`);
+    }
+    expect(cache.size).toBe(1000);
+
+    await service.obtenerEmail('token-1000', 'sub-1000');
+
+    expect(cache.size).toBe(1000);
+    expect(cache.has('sub-0')).toBe(false);
+    expect(cache.has('sub-1000')).toBe(true);
+  });
 });

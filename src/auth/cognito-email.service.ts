@@ -12,6 +12,7 @@ interface EntradaCache {
 
 const TTL_CACHE_MS = 5 * 60 * 1000;
 const TIMEOUT_GET_USER_MS = 2000;
+const MAX_CACHE_ENTRADAS = 1000;
 
 /**
  * El access token de Cognito nunca trae el claim `email` (solo el ID token
@@ -43,7 +44,7 @@ export class CognitoEmailService {
       );
       const email = resultado.UserAttributes?.find((a) => a.Name === 'email')?.Value;
       if (email) {
-        this.cache.set(sub, { email, expiraEn: Date.now() + TTL_CACHE_MS });
+        this.guardarEnCache(sub, email);
       }
       return email;
     } catch (error) {
@@ -61,5 +62,24 @@ export class CognitoEmailService {
       );
     });
     return Promise.race([promesa, timeout]).finally(() => clearTimeout(temporizador));
+  }
+
+  /** Borra entradas vencidas y, si se llega al máximo, la más antigua (orden de inserción del Map). */
+  private guardarEnCache(sub: string, email: string): void {
+    const ahora = Date.now();
+    for (const [clave, entrada] of this.cache) {
+      if (entrada.expiraEn <= ahora) {
+        this.cache.delete(clave);
+      }
+    }
+
+    if (this.cache.size >= MAX_CACHE_ENTRADAS) {
+      const masAntigua = this.cache.keys().next().value;
+      if (masAntigua !== undefined) {
+        this.cache.delete(masAntigua);
+      }
+    }
+
+    this.cache.set(sub, { email, expiraEn: ahora + TTL_CACHE_MS });
   }
 }
