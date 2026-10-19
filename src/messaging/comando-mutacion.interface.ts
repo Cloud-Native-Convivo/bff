@@ -3,6 +3,7 @@ export interface ComandoMutacion<T = unknown> {
   modulo: 'ESPACIOS' | 'GASTOS' | 'CONDOMINIOS';
   accion: string;
   usuario_id: string;
+  usuario_email?: string;
   rol: string;
   path: string;
   metodo: string;

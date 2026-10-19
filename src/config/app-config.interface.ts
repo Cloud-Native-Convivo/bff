@@ -10,6 +10,7 @@ export interface AppConfig {
   entratJwksUri: string;
   cognitoUserPoolId: string;
   cognitoAppClientId: string;
+  cognitoRegion: string;
   cognitoIssuer: string;
   cognitoJwksUri: string;
   claimDeRol: string;

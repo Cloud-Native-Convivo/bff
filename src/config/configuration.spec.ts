@@ -66,6 +66,14 @@ describe('configuration', () => {
     expect(() => conEntorno({ NODE_ENV: 'production' })).toThrow(/EUREKA_PASSWORD/);
   });
 
+  it('expone cognitoRegion desde COGNITO_REGION, con fallback a us-east-1', () => {
+    const porDefecto = conEntorno({});
+    expect(porDefecto.cognitoRegion).toBe('us-east-1');
+
+    const explicita = conEntorno({ COGNITO_REGION: 'sa-east-1' });
+    expect(explicita.cognitoRegion).toBe('sa-east-1');
+  });
+
   it('en producción arma la URL de Eureka con las credenciales dadas', () => {
     const c = conEntorno({
       NODE_ENV: 'production',
