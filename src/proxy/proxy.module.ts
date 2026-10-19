@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
+import { AuthModule } from '../auth/auth.module';
 import { GastosProxyController } from './gastos-proxy.controller';
 import { EspaciosProxyController } from './espacios-proxy.controller';
 import { CondominiosProxyController } from './condominios-proxy.controller';
@@ -12,7 +13,7 @@ import { AsyncMutationService } from './async-mutation.service';
 import { GastosPdfProxyController } from './gastos-pdf-proxy.controller';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule, AuthModule],
   controllers: [
     GastosProxyController,
     EspaciosProxyController,

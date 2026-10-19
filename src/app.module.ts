@@ -7,7 +7,6 @@ import { HealthModule } from './health/health.module';
 import { ProxyModule } from './proxy/proxy.module';
 import { AuthModule } from './auth/auth.module';
 import { AuthorizationModule } from './authorization/authorization.module';
-import { RolesGuard } from './authorization/roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { MessagingModule } from './messaging/messaging.module';
 
@@ -28,10 +27,6 @@ import { MessagingModule } from './messaging/messaging.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
     },
   ],
 })

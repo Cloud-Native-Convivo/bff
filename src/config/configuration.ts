@@ -42,6 +42,7 @@ export const configuration = (): AppConfig => {
       `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`,
     cognitoUserPoolId,
     cognitoAppClientId,
+    cognitoRegion,
     cognitoIssuer,
     cognitoJwksUri,
     claimDeRol: process.env.CLAIM_DE_ROL ?? 'roles',
