@@ -31,7 +31,23 @@ services:
     networks:
       - convivo-network
 
+  scanner:
+    image: sonarsource/sonar-scanner-cli:latest
+    container_name: convivo-bff-scanner
+    profiles:
+      - tools
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - SONAR_HOST_URL=http://sonarqube:9000
+      - SONAR_TOKEN=${SONAR_TOKEN:-}
+    volumes:
+      - ./:/usr/src
+    networks:
+      - convivo-network
 networks:
   convivo-network:
     external: true
     name: convivo-network
+

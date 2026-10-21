@@ -1,3 +1,4 @@
+import { Agent } from 'node:https';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
@@ -17,12 +18,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
     const audience = config.getOrThrow<string>('entratApiClientId');
     const jwksUri = config.getOrThrow<string>('entratJwksUri');
 
+    // Solo la audiencia de la API (access token emitido para el scope
+    // api://<api>/access_as_user). No se acepta el client ID del panel
+    // (8c375036-...): un token con esa audiencia es el ID token del panel, que
+    // identifica al usuario ante el front pero no autoriza llamadas a la API.
     const cleanAudience = audience.replace(/^api:\/\//, '');
-    const audiences = [
-      cleanAudience,
-      `api://${cleanAudience}`,
-      '8c375036-6298-414a-bc3f-eb0f8fbdf26c',
-    ];
+    const audiences = [cleanAudience, `api://${cleanAudience}`];
 
     const issuers = [
       issuer,
@@ -35,8 +36,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
-        jwksRequestsPerMinute: 5,
+        jwksRequestsPerMinute: 50,
         jwksUri,
+        // ponytail: musl (node:24-alpine) pierde los registros A de
+        // login.microsoftonline.com con AF_UNSPEC y Node solo ve IPv6, sin ruta
+        // en Docker (ENETUNREACH). Forzar IPv4; quitar si la imagen pasa a glibc.
+        requestAgent: jwksUri.startsWith('https:') ? new Agent({ family: 4 }) : undefined,
       }),
       issuer: issuers,
       audience: audiences,
@@ -45,7 +50,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt-entra') {
   }
 
   async validate(payload: Record<string, unknown>): Promise<UsuarioAutenticado> {
-    if (!payload || (typeof payload.oid !== 'string' && typeof payload.sub !== 'string')) {
+    const id =
+      (typeof payload?.oid === 'string' && payload.oid.trim()) ||
+      (typeof payload?.sub === 'string' && payload.sub.trim());
+    if (!id) {
       throw new UnauthorizedException('Token inválido: falta oid o sub');
     }
     return this.mapper.toUsuario(payload);

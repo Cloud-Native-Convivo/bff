@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { MessageBroker } from './message-broker.interface';
+import type { ComandoMutacion } from './comando-mutacion.interface';
 
 /**
  * Servicio de mensajería y nivelación de carga (Queue-based Load Leveling).
@@ -47,6 +48,15 @@ export class MessagingService
     await this.cerrarConexion();
   }
 
+  private safeStringify(payload: unknown): string {
+    if (typeof payload === 'string') return payload;
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return '[Unserializable Payload]';
+    }
+  }
+
   isReady(): boolean {
     return this.connection !== null && this.channel !== null;
   }
@@ -59,15 +69,13 @@ export class MessagingService
     if (!this.isReady()) {
       this.logger.warn(
         `publish buffering/fallback (RabbitMQ no conectado aún): ${exchange}/${routingKey}`,
-        typeof payload === 'object' ? JSON.stringify(payload) : String(payload),
+        this.safeStringify(payload),
       );
       return;
     }
 
     try {
-      const buffer = Buffer.from(
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
-      );
+      const buffer = Buffer.from(this.safeStringify(payload));
       const ex = exchange || this.config.get<string>('rabbitmqExchange') || 'espacios_events';
       await this.channel!.assertExchange(ex, 'topic', { durable: true });
       this.channel!.publish(ex, routingKey, buffer, {
@@ -77,6 +85,31 @@ export class MessagingService
       this.logger.debug(`Mensaje publicado en exchange ${ex} con routingKey ${routingKey}`);
     } catch (error) {
       this.logger.error(`Error publicando mensaje a RabbitMQ: ${String(error)}`);
+    }
+  }
+
+  async publishFanout(
+    exchange: string,
+    payload: unknown,
+  ): Promise<void> {
+    if (!this.isReady()) {
+      this.logger.warn(
+        `publishFanout buffering/fallback (RabbitMQ no conectado aún): ${exchange}`,
+        this.safeStringify(payload),
+      );
+      return;
+    }
+
+    try {
+      const buffer = Buffer.from(this.safeStringify(payload));
+      await this.channel!.assertExchange(exchange, 'fanout', { durable: true });
+      this.channel!.publish(exchange, '', buffer, {
+        persistent: true,
+        contentType: 'application/json',
+      });
+      this.logger.debug(`Mensaje publicado en exchange fanout ${exchange}`);
+    } catch (error) {
+      this.logger.error(`Error publicando en exchange fanout ${exchange}: ${String(error)}`);
     }
   }
 
@@ -93,9 +126,7 @@ export class MessagingService
     }
 
     try {
-      const buffer = Buffer.from(
-        typeof payload === 'string' ? payload : JSON.stringify(payload),
-      );
+      const buffer = Buffer.from(this.safeStringify(payload));
       await this.channel!.assertQueue(queue, { durable: true });
       this.channel!.sendToQueue(queue, buffer, {
         persistent: true,
@@ -106,6 +137,13 @@ export class MessagingService
     } catch (error) {
       this.logger.error(`Error enviando mensaje a cola ${queue}: ${String(error)}`);
     }
+  }
+
+  async encolarComando(
+    queue: string,
+    comando: ComandoMutacion,
+  ): Promise<void> {
+    await this.sendToQueue(queue, JSON.stringify(comando));
   }
 
   private async conectar(): Promise<void> {

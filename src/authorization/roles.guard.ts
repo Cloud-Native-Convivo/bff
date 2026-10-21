@@ -27,28 +27,12 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<{
-      user?: UsuarioAutenticado;
-      headers?: Record<string, string | string[] | undefined>;
-    }>();
-    let roles = request.user?.roles ?? [];
-
-    if (roles.length === 0 && request.headers) {
-      const headerRoles = request.headers['x-usuario-roles'];
-      if (typeof headerRoles === 'string') {
-        roles = headerRoles
-          .split(',')
-          .map((r) => r.trim())
-          .filter((v): v is Rol =>
-            v === 'residente' ||
-            v === 'propietario' ||
-            v === 'admin' ||
-            v === 'administrador' ||
-            v === 'conserje' ||
-            v === 'comite',
-          );
-      }
-    }
+    // Los roles salen solo del JWT validado (request.user). Nunca de headers
+    // del cliente: X-Usuario-Roles es spoofeable (OWASP A01).
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: UsuarioAutenticado }>();
+    const roles = request.user?.roles ?? [];
 
     if (required.some((rol) => roles.includes(rol))) {
       return true;

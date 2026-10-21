@@ -24,7 +24,7 @@ export class JwtCognitoStrategy extends PassportStrategy(Strategy, 'jwt-cognito'
       secretOrKeyProvider: passportJwtSecret({
         cache: true,
         rateLimit: true,
-        jwksRequestsPerMinute: 5,
+        jwksRequestsPerMinute: 50,
         jwksUri,
       }),
       issuer,
@@ -35,13 +35,20 @@ export class JwtCognitoStrategy extends PassportStrategy(Strategy, 'jwt-cognito'
   }
 
   async validate(payload: Record<string, unknown>): Promise<UsuarioAutenticado> {
-    if (!payload || typeof payload.sub !== 'string') {
+    if (!payload || typeof payload.sub !== 'string' || !payload.sub.trim()) {
       throw new UnauthorizedException('Token inválido: falta sub de Cognito');
     }
-    const tokenClient = payload.aud ?? payload.client_id;
-    if (tokenClient !== this.clientId) {
+    // Solo access tokens: el ID token es para que el front sepa quién es el usuario,
+    // no para autorizar llamadas a la API. Cognito marca cada uno en `token_use`
+    // y el access token trae `client_id` (el ID token trae `aud` en su lugar).
+    if (payload.token_use !== 'access') {
       throw new UnauthorizedException(
-        'Token inválido: audiencia o client_id de Cognito no coincide',
+        'Token inválido: se requiere un access token de Cognito',
+      );
+    }
+    if (payload.client_id !== this.clientId) {
+      throw new UnauthorizedException(
+        'Token inválido: client_id de Cognito no coincide',
       );
     }
     return this.mapper.toUsuarioCognito(payload);

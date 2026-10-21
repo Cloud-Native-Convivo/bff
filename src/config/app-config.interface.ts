@@ -10,6 +10,7 @@ export interface AppConfig {
   entratJwksUri: string;
   cognitoUserPoolId: string;
   cognitoAppClientId: string;
+  cognitoRegion: string;
   cognitoIssuer: string;
   cognitoJwksUri: string;
   claimDeRol: string;
@@ -17,6 +18,7 @@ export interface AppConfig {
   claimMap: Record<string, string>;
   gastosComunesUrl: string;
   espaciosComunesUrl: string;
+  condominiosUrl: string;
   proxyTimeoutMs: number;
   eurekaUrl: string;
   rabbitmqEnabled: boolean;

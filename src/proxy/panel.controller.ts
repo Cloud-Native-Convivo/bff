@@ -1,4 +1,4 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { ProxyService } from './proxy.service';
 import { UsuarioActual } from '../auth/usuario-actual.decorator';
@@ -15,8 +15,9 @@ export class PanelController {
   @Get()
   async obtenerPanel(
     @Req() req: Request,
+    @Query('condominioId') condominioId: string,
     @UsuarioActual() user?: UsuarioAutenticado,
   ) {
-    return this.proxy.obtenerPanel(req.headers, user);
+    return this.proxy.obtenerPanel(req.headers, user, condominioId);
   }
 }

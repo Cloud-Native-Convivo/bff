@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { stripTrailingSlashes } from '../common/strip-trailing-slashes';
 
 interface CacheEntry {
   url: string;
@@ -27,7 +28,7 @@ export class EurekaDiscoveryService {
     }
 
     try {
-      const cleanEureka = eurekaUrl.replace(/\/+$/, '');
+      const cleanEureka = stripTrailingSlashes(eurekaUrl);
       const response = await axios.get(`${cleanEureka}/apps/${appName}`, {
         headers: { Accept: 'application/json' },
         timeout: 1500,
@@ -42,7 +43,7 @@ export class EurekaDiscoveryService {
         const portObj = instance.port;
         const portNumber = typeof portObj === 'object' ? portObj['$'] : portObj;
 
-        let resolvedUrl = homePageUrl ? homePageUrl.replace(/\/+$/, '') : null;
+        let resolvedUrl = homePageUrl ? stripTrailingSlashes(homePageUrl) : null;
         if (!resolvedUrl && ipAddr && portNumber) {
           resolvedUrl = `http://${ipAddr}:${portNumber}`;
         }

@@ -6,9 +6,41 @@ import { isAxiosError } from 'axios';
 import CircuitBreaker from 'opossum';
 import { lastValueFrom } from 'rxjs';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+import { stripTrailingSlashes } from '../common/strip-trailing-slashes';
 import { EurekaDiscoveryService } from './eureka-discovery.service';
 
 const CORRELATION_HEADER = 'x-correlation-id';
+
+type HeadersEntrantes = Record<string, string | string[] | undefined>;
+
+const PREFIJO_ESPACIOS_BFF = '/api/v1/espacios-comunes';
+
+/**
+ * Traduce la ruta pública del BFF a la ruta del microservicio de Espacios
+ * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf / ERS.md) se
+ * reescribe a /reservas/ inyectando espacio_id en el body.
+ */
+export function resolverRutaEspacios(path: string, body?: unknown): string {
+  const ruta = path.startsWith(PREFIJO_ESPACIOS_BFF) ? path.slice(PREFIJO_ESPACIOS_BFF.length) : path;
+
+  const idReservasMatch = /^\/?(?:espacios\/)?(\d+)\/reservas\/?$/.exec(ruta);
+  if (idReservasMatch) {
+    if (body && typeof body === 'object') {
+      (body as Record<string, unknown>).espacio_id = Number.parseInt(idReservasMatch[1], 10);
+    }
+    return '/reservas/';
+  }
+  return normalizarRutaEspacios(ruta);
+}
+
+/** Antepone /espacios a rutas sin recurso conocido y agrega el slash final que exige FastAPI. */
+export function normalizarRutaEspacios(ruta: string): string {
+  if (ruta === '' || ruta === '/' || ruta === '/espacios') return '/espacios/';
+  if (ruta === '/reservas') return '/reservas/';
+  const recursoConocido = ['/espacios', '/reservas', '/health'].some((p) => ruta.startsWith(p));
+  if (recursoConocido) return ruta;
+  return ruta.startsWith('/') ? `/espacios${ruta}` : `/espacios/${ruta}`;
+}
 
 /**
  * Servicio de reenvío (reverse proxy) del BFF hacia los microservicios.
@@ -18,6 +50,7 @@ const CORRELATION_HEADER = 'x-correlation-id';
 export class ProxyService {
   private readonly gastosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
   private readonly espaciosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
+  private readonly condominiosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
 
   constructor(
     private readonly http: HttpService,
@@ -51,6 +84,10 @@ export class ProxyService {
       ...baseOptions,
       name: 'espacios-comunes',
     });
+    this.condominiosBreaker = new CircuitBreaker(doRequest, {
+      ...baseOptions,
+      name: 'condominios',
+    });
   }
 
   /**
@@ -65,7 +102,7 @@ export class ProxyService {
     path: string,
     query: string,
     body?: unknown,
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const fallbackUrl = this.config.get<string>('gastosComunesUrl') ?? 'http://localhost:8083';
@@ -89,6 +126,31 @@ export class ProxyService {
     }
   }
 
+  async forwardGastosBinary(
+    path: string,
+    headers?: HeadersEntrantes,
+    user?: UsuarioAutenticado,
+  ): Promise<{ data: Buffer; headers: Record<string, string> }> {
+    const fallbackUrl = this.config.get<string>('gastosComunesUrl') ?? 'http://localhost:8083';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-GASTOS-COMUNES', fallbackUrl);
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 5000;
+    const url = `${baseUrl}${path}`;
+
+    try {
+      const response = (await this.gastosBreaker.fire({
+        method: 'GET',
+        url,
+        responseType: 'arraybuffer',
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: ArrayBuffer; headers: Record<string, string> };
+
+      return { data: Buffer.from(response.data), headers: response.headers };
+    } catch (error) {
+      throw this.toServiceError(error, 'gastos-comunes');
+    }
+  }
+
   /**
    * Reenvía la solicitud del cliente a la URL base del microservicio
    * de Espacios Comunes, conservando path, query, método HTTP y los headers
@@ -99,47 +161,18 @@ export class ProxyService {
     path: string,
     query: string,
     body?: unknown,
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Promise<unknown> {
     const fallbackUrl =
       this.config.get<string>('espaciosComunesUrl') ?? 'http://localhost:8082';
     let baseUrl = await this.eureka.resolveServiceUrl('MS-ESPACIOS-COMUNES', fallbackUrl);
-    baseUrl = baseUrl.replace(/\/+$/, '');
+    baseUrl = stripTrailingSlashes(baseUrl);
     if (!baseUrl.endsWith('/api/v1')) {
       baseUrl = `${baseUrl}/api/v1`;
     }
 
-    let targetPath = path;
-    if (targetPath.startsWith('/api/v1/espacios-comunes')) {
-      targetPath = targetPath.slice('/api/v1/espacios-comunes'.length);
-    }
-
-    // Soporte para ruta RESTful /:id/reservas (especificada en api_gateway.tf / mvp.md)
-    const idReservasMatch = targetPath.match(/^\/?(?:espacios\/)?(\d+)\/reservas\/?$/);
-    if (idReservasMatch) {
-      targetPath = '/reservas/';
-      const espacioId = parseInt(idReservasMatch[1], 10);
-      if (body && typeof body === 'object') {
-        (body as Record<string, unknown>).espacio_id = espacioId;
-      }
-    }
-
-    if (
-      !targetPath.startsWith('/espacios') &&
-      !targetPath.startsWith('/reservas') &&
-      !targetPath.startsWith('/health')
-    ) {
-      if (targetPath === '' || targetPath === '/') {
-        targetPath = '/espacios/';
-      } else {
-        targetPath = `/espacios${targetPath.startsWith('/') ? targetPath : `/${targetPath}`}`;
-      }
-    } else if (targetPath === '/espacios') {
-      targetPath = '/espacios/';
-    } else if (targetPath === '/reservas') {
-      targetPath = '/reservas/';
-    }
+    const targetPath = resolverRutaEspacios(path, body);
 
     const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
     const suffix = query ? `?${query}` : '';
@@ -161,20 +194,61 @@ export class ProxyService {
   }
 
   /**
+   * Reenvía la solicitud del cliente a la URL base del microservicio
+   * de Condominios, conservando path, query, método HTTP y los headers
+   * relevantes (Autorización, Content-Type y correlación).
+   */
+  async forwardCondominios(
+    method: string,
+    path: string,
+    query: string,
+    body?: unknown,
+    headers?: HeadersEntrantes,
+    user?: UsuarioAutenticado,
+  ): Promise<unknown> {
+    const fallbackUrl = this.config.get<string>('condominiosUrl') ?? 'http://localhost:8084';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-CONDOMINIOS', fallbackUrl);
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
+    const suffix = query ? `?${query}` : '';
+    // ms-condominios usa /condominios como prefijo
+    const url = `${baseUrl}/condominios${path}${suffix}`;
+
+    try {
+      const { data } = (await this.condominiosBreaker.fire({
+        method,
+        url,
+        data: body,
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
+
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'condominios');
+    }
+  }
+
+  /**
    * Agrega reservas (Espacios Comunes) y gastos comunes del usuario actual
    * para el panel del residente (RF-T.7). Cada llamada downstream se
    * aísla: si un microservicio falla, el otro igual responde y el error
    * queda reportado en `errores` en vez de tumbar el endpoint completo.
    */
   async obtenerPanel(
-    headers: Record<string, string | string[] | undefined>,
+    headers: HeadersEntrantes,
     user?: UsuarioAutenticado,
+    condominioId?: string,
   ): Promise<{ reservas: unknown; gastos: unknown; errores: string[] }> {
     const errores: string[] = [];
 
     // forwardGastos no reescribe el path (a diferencia de forwardEspacios):
     // hay que pasarle la ruta real del microservicio (@RequestMapping de
-    // GastoComunController), no un alias corto.
+    // GastoComunController), no un alias corto. GastoComunController exige
+    // condominioId como query param obligatorio -- sin esto, Spring responde
+    // 400/500 y el circuit breaker lo cuenta como falla (abre y esconde el
+    // error real detrás de un 503 para todo el resto de llamadas).
+    const gastosQuery = condominioId ? `condominioId=${encodeURIComponent(condominioId)}` : '';
+
     const [reservas, gastos] = await Promise.all([
       this.forwardEspacios('GET', '/reservas', '', undefined, headers, user).catch(
         (error) => {
@@ -182,7 +256,7 @@ export class ProxyService {
           return null;
         },
       ),
-      this.forwardGastos('GET', '/api/v1/gastos-comunes', '', undefined, headers, user).catch(
+      this.forwardGastos('GET', '/api/v1/gastos-comunes', gastosQuery, undefined, headers, user).catch(
         (error) => {
           errores.push(`gastos-comunes: ${extractErrorMessage(error)}`);
           return null;
@@ -214,7 +288,7 @@ export class ProxyService {
    * Inyecta identidad del usuario autenticado (x-usuario-sub y x-usuario-roles).
    */
   private buildForwardHeaders(
-    headers?: Record<string, string | string[] | undefined>,
+    headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
   ): Record<string, string> {
     const forward: Record<string, string> = {};
@@ -233,12 +307,27 @@ export class ProxyService {
     forward[CORRELATION_HEADER] =
       asString(source[CORRELATION_HEADER]) ?? newCorrelationId();
 
-    forward['x-usuario-sub'] =
-      user?.sub ?? asString(source['x-usuario-sub']) ?? 'anonimo';
-    forward['x-usuario-roles'] =
-      user?.roles && user.roles.length > 0
-        ? user.roles.join(',')
-        : (asString(source['x-usuario-roles']) ?? '');
+    // Identidad solo desde el JWT validado: los x-usuario-* que mande el
+    // cliente se descartan (los microservicios confían en estos headers).
+    forward['x-usuario-sub'] = user?.sub || 'anonimo';
+    forward['x-usuario-roles'] = user?.roles?.join(',') ?? '';
+
+    const unidadId =
+      (user?.claims?.['unidad_id'] as string) ??
+      (user?.claims?.['custom:unidad'] as string) ??
+      (user?.claims?.['unidad'] as string);
+    if (unidadId) {
+      forward['x-usuario-unidad'] = unidadId;
+      forward['x-usuario-unidad-id'] = unidadId;
+    }
+
+    const condominioId =
+      (user?.claims?.['condominio_id'] as string | number) ??
+      (user?.claims?.['custom:condominio'] as string | number) ??
+      (user?.claims?.['condominio'] as string | number);
+    if (condominioId !== undefined && condominioId !== null && String(condominioId).trim() !== '') {
+      forward['x-condominio-id'] = String(condominioId).trim();
+    }
 
     return forward;
   }

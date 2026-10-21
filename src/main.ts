@@ -21,7 +21,7 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  const port = parseInt(process.env.PORT ?? '3000', 10);
+  const port = Number.parseInt(process.env.PORT ?? '3000', 10);
   await app.listen(port);
   Logger.log(
     `CONVIVO BFF corriendo en http://localhost:${port}/${globalPrefix}`,

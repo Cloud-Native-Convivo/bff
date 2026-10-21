@@ -3,11 +3,12 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { firstValueFrom, isObservable } from 'rxjs';
+import { stripTrailingSlashes } from '../common/strip-trailing-slashes';
 import { PUBLIC_KEY } from './public.decorator';
 
 function isPublicEspacioGet(method: string, url: string): boolean {
   if (method !== 'GET') return false;
-  const path = url.split('?')[0].replace(/\/+$/, '');
+  const path = stripTrailingSlashes(url.split('?')[0]);
   if (path.includes('/reservas')) return false;
   return (
     path === '/api/v1/espacios-comunes' ||
@@ -19,7 +20,7 @@ function isPublicEspacioGet(method: string, url: string): boolean {
 
 /**
  * Guard global de autenticación dual (Entra ID + Cognito).
- * Valida el Access/ID Token JWT mediante las estrategias Passport
+ * Valida el Access Token JWT (nunca el ID token) mediante las estrategias Passport
  * 'jwt-entra' y 'jwt-cognito'. Las rutas marcadas con @IsPublic() se omiten.
  * El catálogo de espacios (`isPublicEspacioGet`) es público: si trae token
  * válido, resuelve identidad igual; si no trae token o el token es
@@ -58,8 +59,6 @@ export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
     return isObservable(res) ? await firstValueFrom(res) : await res;
   }
 
-  // DEBUG temporal: diagnostico del 401 "sesion expirada/invalida" -- Passport
-  // no loguea por que rechazo el JWT (firma/issuer/audience/exp).
   handleRequest<TUser = unknown>(
     err: unknown,
     user: TUser,
@@ -68,11 +67,21 @@ export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
     status?: unknown,
   ): TUser {
     if (err || !user) {
-      const detalle = info as { message?: string; name?: string } | undefined;
-      console.error('DEBUG JwtAuthGuard reject:', {
+      const req = context.switchToHttp().getRequest<Request>();
+      const authHeader = req.headers?.authorization;
+      console.error('DEBUG Auth failure details:', {
+        url: req.url,
+        hasAuthorizationHeader: Boolean(authHeader),
+        authHeaderPrefix: authHeader ? authHeader.slice(0, 20) : 'NONE',
         err: err instanceof Error ? err.message : err,
-        infoName: detalle?.name,
-        infoMessage: detalle?.message ?? String(info),
+        infoType: typeof info,
+        infoMessage: (info as any)?.message,
+        infoErrors: (info as any)?.errors?.map((e: any) => ({
+          name: e?.name,
+          message: e?.message,
+          stack: e?.stack?.slice(0, 150),
+        })),
+        rawInfo: info,
       });
     }
     return super.handleRequest(err, user, info, context, status);
