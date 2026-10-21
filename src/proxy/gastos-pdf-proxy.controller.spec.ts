@@ -3,12 +3,14 @@ import { HttpStatus } from '@nestjs/common';
 import { GastosPdfProxyController } from './gastos-pdf-proxy.controller';
 import { MessagingService } from '../messaging/messaging.service';
 import { ProxyService } from './proxy.service';
-import type { Response } from 'express';
+import { CognitoEmailService } from '../auth/cognito-email.service';
+import type { Request, Response } from 'express';
 
 describe('GastosPdfProxyController', () => {
   let controller: GastosPdfProxyController;
   let messagingService: { publishFanout: jest.Mock };
   let proxyService: { forwardGastosBinary: jest.Mock };
+  let cognitoEmailService: { obtenerEmail: jest.Mock };
 
   beforeEach(async () => {
     messagingService = {
@@ -20,23 +22,28 @@ describe('GastosPdfProxyController', () => {
         headers: { 'content-type': 'application/pdf' },
       }),
     };
+    cognitoEmailService = {
+      obtenerEmail: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GastosPdfProxyController],
       providers: [
         { provide: MessagingService, useValue: messagingService },
         { provide: ProxyService, useValue: proxyService },
+        { provide: CognitoEmailService, useValue: cognitoEmailService },
       ],
     }).compile();
 
     controller = module.get<GastosPdfProxyController>(GastosPdfProxyController);
   });
 
-  it('debe responder 202 Accepted y publicar en exchange fanout al solicitar pdf', async () => {
+  it('debe responder 202 Accepted y publicar en exchange fanout al solicitar pdf (usuario Entra ID, email directo del claim)', async () => {
     const mockRes = {
       status: jest.fn().mockReturnThis(),
       setHeader: jest.fn().mockReturnThis(),
     } as unknown as Response;
+    const mockReq = { headers: {} } as Request;
 
     const user = {
       sub: 'user-1',
@@ -47,6 +54,7 @@ describe('GastosPdfProxyController', () => {
 
     const res = await controller.solicitarPdf(
       { unidadId: '301-A', mes: 'Agosto 2026' },
+      mockReq,
       mockRes,
       user,
     );
@@ -54,6 +62,7 @@ describe('GastosPdfProxyController', () => {
     expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.ACCEPTED);
     expect(res.estado).toBe('PENDIENTE');
     expect(res.ticket_id).toBeDefined();
+    expect(cognitoEmailService.obtenerEmail).not.toHaveBeenCalled();
     expect(messagingService.publishFanout).toHaveBeenCalledWith(
       'gastos.pdf.fanout',
       expect.objectContaining({
@@ -61,6 +70,53 @@ describe('GastosPdfProxyController', () => {
         unidad_id: '301-A',
         email: 'vecino@convivo.cl',
       }),
+    );
+  });
+
+  it('usuario Cognito (access token sin claim email): resuelve el email real via CognitoEmailService.GetUser', async () => {
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      setHeader: jest.fn().mockReturnThis(),
+    } as unknown as Response;
+    const mockReq = { headers: { authorization: 'Bearer token-crudo-cognito' } } as Request;
+
+    cognitoEmailService.obtenerEmail.mockResolvedValue('residente-real@gmail.com');
+
+    const user = {
+      sub: 'cognito-sub-1',
+      roles: ['residente' as const],
+      claims: { token_use: 'access', client_id: 'app-client-1' },
+    };
+
+    const res = await controller.solicitarPdf({ unidadId: '301-A' }, mockReq, mockRes, user);
+
+    expect(cognitoEmailService.obtenerEmail).toHaveBeenCalledWith('token-crudo-cognito', 'cognito-sub-1');
+    expect(messagingService.publishFanout).toHaveBeenCalledWith(
+      'gastos.pdf.fanout',
+      expect.objectContaining({ ticket_id: res.ticket_id, email: 'residente-real@gmail.com' }),
+    );
+  });
+
+  it('usuario Cognito sin GetUser disponible: cae al placeholder en vez de fallar la solicitud', async () => {
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      setHeader: jest.fn().mockReturnThis(),
+    } as unknown as Response;
+    const mockReq = { headers: { authorization: 'Bearer token-crudo-cognito' } } as Request;
+
+    cognitoEmailService.obtenerEmail.mockResolvedValue(undefined);
+
+    const user = {
+      sub: 'cognito-sub-2',
+      roles: ['residente' as const],
+      claims: { token_use: 'access', client_id: 'app-client-1' },
+    };
+
+    await controller.solicitarPdf({ unidadId: '301-A' }, mockReq, mockRes, user);
+
+    expect(messagingService.publishFanout).toHaveBeenCalledWith(
+      'gastos.pdf.fanout',
+      expect.objectContaining({ email: 'residente@convivo.cl' }),
     );
   });
 
