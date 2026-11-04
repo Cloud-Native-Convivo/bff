@@ -40,7 +40,7 @@ microservicios.
 
 ## Requisitos
 
-- Node.js >= 20
+- Node.js >= 26
 - npm
 
 ## Instalación
