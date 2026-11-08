@@ -17,7 +17,7 @@ const PREFIJO_ESPACIOS_BFF = '/api/v1/espacios-comunes';
 
 /**
  * Traduce la ruta pública del BFF a la ruta del microservicio de Espacios
- * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf / ERS.md) se
+ * Comunes. La ruta RESTful /:id/reservas (api_gateway.tf) se
  * reescribe a /reservas/ inyectando espacio_id en el body.
  */
 export function resolverRutaEspacios(path: string, body?: unknown): string {
@@ -51,6 +51,7 @@ export class ProxyService {
   private readonly gastosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
   private readonly espaciosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
   private readonly condominiosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
+  private readonly usuariosBreaker: CircuitBreaker<[AxiosRequestConfig], unknown>;
 
   constructor(
     private readonly http: HttpService,
@@ -87,6 +88,10 @@ export class ProxyService {
     this.condominiosBreaker = new CircuitBreaker(doRequest, {
       ...baseOptions,
       name: 'condominios',
+    });
+    this.usuariosBreaker = new CircuitBreaker(doRequest, {
+      ...baseOptions,
+      name: 'usuarios',
     });
   }
 
@@ -225,6 +230,39 @@ export class ProxyService {
       return data;
     } catch (error) {
       throw this.toServiceError(error, 'condominios');
+    }
+  }
+
+  /**
+   * Reenvía la solicitud a ms-usuario-cloud (prefijo /usuarios), conservando
+   * método, query y headers de identidad.
+   */
+  async forwardUsuarios(
+    method: string,
+    path: string,
+    query: string,
+    body?: unknown,
+    headers?: HeadersEntrantes,
+    user?: UsuarioAutenticado,
+  ): Promise<unknown> {
+    const fallbackUrl = this.config.get<string>('usuariosUrl') ?? 'http://localhost:8085';
+    const baseUrl = await this.eureka.resolveServiceUrl('MS-USUARIO-CLOUD', fallbackUrl);
+    const timeout = this.config.get<number>('proxyTimeoutMs') ?? 2000;
+    const suffix = query ? `?${query}` : '';
+    const url = `${baseUrl}/usuarios${path}${suffix}`;
+
+    try {
+      const { data } = (await this.usuariosBreaker.fire({
+        method,
+        url,
+        data: body,
+        timeout,
+        headers: this.buildForwardHeaders(headers, user),
+      })) as { data: unknown };
+
+      return data;
+    } catch (error) {
+      throw this.toServiceError(error, 'usuarios');
     }
   }
 
