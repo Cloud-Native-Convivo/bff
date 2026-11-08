@@ -19,6 +19,7 @@ export interface AppConfig {
   gastosComunesUrl: string;
   espaciosComunesUrl: string;
   condominiosUrl: string;
+  usuariosUrl: string;
   proxyTimeoutMs: number;
   eurekaUrl: string;
   rabbitmqEnabled: boolean;

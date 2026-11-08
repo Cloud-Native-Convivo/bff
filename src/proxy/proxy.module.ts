@@ -4,6 +4,7 @@ import { AuthModule } from "../auth/auth.module";
 import { GastosProxyController } from "./gastos-proxy.controller";
 import { EspaciosProxyController } from "./espacios-proxy.controller";
 import { CondominiosProxyController } from "./condominios-proxy.controller";
+import { UsuariosProxyController } from "./usuarios-proxy.controller";
 import { PanelController } from "./panel.controller";
 import { ProxyService } from "./proxy.service";
 import { EurekaDiscoveryService } from "./eureka-discovery.service";
@@ -18,6 +19,7 @@ import { GastosPdfProxyController } from "./gastos-pdf-proxy.controller";
     GastosProxyController,
     EspaciosProxyController,
     CondominiosProxyController,
+    UsuariosProxyController,
     PanelController,
     JobsProxyController,
     GastosPdfProxyController,

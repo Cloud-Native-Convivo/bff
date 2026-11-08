@@ -54,6 +54,8 @@ export const configuration = (): AppConfig => {
       process.env.ESPACIOS_COMUNES_URL ?? 'http://localhost:8082',
     condominiosUrl:
       process.env.CONDOMINIOS_URL ?? 'http://localhost:8084',
+    usuariosUrl:
+      process.env.USUARIOS_URL ?? 'http://localhost:8085',
     eurekaUrl: resolveEurekaUrl(),
     proxyTimeoutMs: Number.parseInt(process.env.PROXY_TIMEOUT_MS ?? '2000', 10),
     rabbitmqEnabled: (process.env.RABBITMQ_ENABLED ?? 'false') === 'true',
