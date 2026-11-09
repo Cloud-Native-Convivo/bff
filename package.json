@@ -31,7 +31,7 @@
     "node": ">=26"
   },
   "dependencies": {
-    "@aws-sdk/client-cognito-identity-provider": "^3.1157.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1161.0",
     "@nestjs/axios": "^12.0.1",
     "@nestjs/common": "^12.3.2",
     "@nestjs/config": "^12.0.1",
