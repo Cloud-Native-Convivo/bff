@@ -9,6 +9,7 @@ import type { Request } from 'express';
 import { MessagingService } from '../messaging/messaging.service';
 import { CognitoEmailService } from '../auth/cognito-email.service';
 import type { ComandoMutacion } from '../messaging/comando-mutacion.interface';
+import { COLAS } from '../messaging/colas';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
 
 export interface Respuesta202 {
@@ -43,7 +44,8 @@ export class AsyncMutationService {
     }
 
     const ticket_id = randomUUID();
-    const queue = modulo === 'ESPACIOS' ? 'espacios_comandos_queue' : 'gastos_comandos_queue';
+    const queue =
+      modulo === 'ESPACIOS' ? COLAS.espaciosComandos.nombre : COLAS.gastosComandos.nombre;
     const usuario_email = await this.resolverEmailSiAplica(accion, req, user);
     const comando: ComandoMutacion = {
       ticket_id,
@@ -58,7 +60,16 @@ export class AsyncMutationService {
       timestamp: new Date().toISOString(),
     };
 
-    await this.messaging.encolarComando(queue, comando);
+    try {
+      await this.messaging.encolarComando(queue, comando);
+    } catch (error) {
+      this.logger.error(`No se pudo encolar [${ticket_id}] ${modulo}:${accion}: ${String(error)}`);
+      throw new ServiceUnavailableException({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'No se pudo encolar la solicitud. Intenta nuevamente en unos segundos.',
+        retryAfter: 5,
+      });
+    }
     this.logger.log(`Mutacion encolada [${ticket_id}] -> ${queue} (${modulo}:${accion})`);
 
     const prefix = modulo === 'ESPACIOS' ? '/api/v1/espacios-comunes' : '/api/v1/gastos';

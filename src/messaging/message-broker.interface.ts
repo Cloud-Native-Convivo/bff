@@ -9,7 +9,9 @@ import type { ComandoMutacion } from './comando-mutacion.interface';
 export interface MessageBroker {
   publish(exchange: string, routingKey: string, payload: unknown): Promise<void>;
   publishFanout(exchange: string, payload: unknown): Promise<void>;
+  /** Lanza si el broker no está conectado, la cola no está registrada en colas.ts o RabbitMQ rechaza la publicación. */
   sendToQueue(queue: string, payload: unknown, options?: { priority?: number }): Promise<void>;
+  /** Igual que sendToQueue: nunca resuelve si el comando no quedó publicado. */
   encolarComando(queue: string, comando: ComandoMutacion): Promise<void>;
   isReady(): boolean;
 }
