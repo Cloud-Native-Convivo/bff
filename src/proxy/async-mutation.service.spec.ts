@@ -4,6 +4,7 @@ import { AsyncMutationService } from './async-mutation.service';
 import type { MessagingService } from '../messaging/messaging.service';
 import type { CognitoEmailService } from '../auth/cognito-email.service';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+import { COLAS } from '../messaging/colas';
 
 describe('AsyncMutationService', () => {
   let service: AsyncMutationService;
@@ -58,6 +59,34 @@ describe('AsyncMutationService', () => {
     mockMessaging.isReady = jest.fn().mockReturnValue(false);
     await expect(service.despachar('ESPACIOS', 'CREAR_RESERVA', mockReq, mockUser))
       .rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('responde 503 y no devuelve ticket si el broker rechaza la publicación (p. ej. 406)', async () => {
+    mockMessaging.encolarComando = jest
+      .fn()
+      .mockRejectedValue(new Error("PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange'"));
+    const intento = service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser);
+    await expect(intento).rejects.toThrow(ServiceUnavailableException);
+    await expect(intento).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 503, retryAfter: 5 }),
+    });
+  });
+
+  it('el 503 por fallo de publicación no filtra el detalle interno de AMQP al cliente', async () => {
+    mockMessaging.encolarComando = jest.fn().mockRejectedValue(new Error('PRECONDITION_FAILED secreto-interno'));
+    const error = await service
+      .despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser)
+      .catch((e: ServiceUnavailableException) => e);
+    expect(JSON.stringify((error as ServiceUnavailableException).getResponse())).not.toMatch(
+      /PRECONDITION|secreto-interno/,
+    );
+  });
+
+  it('usa las constantes de colas.ts para cada módulo', async () => {
+    await service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser);
+    await service.despachar('GASTOS', 'CREAR_GASTO', mockReq, mockUser);
+    const colas = (mockMessaging.encolarComando as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(colas).toEqual([COLAS.espaciosComandos.nombre, COLAS.gastosComandos.nombre]);
   });
 });
 
