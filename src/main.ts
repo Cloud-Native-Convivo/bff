@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { cargarConfiguracionRemota } from './config/cargar-configuracion-remota';
 
 async function bootstrap(): Promise<void> {
+  await cargarConfiguracionRemota();
   const app = await NestFactory.create(AppModule);
 
   const globalPrefix = process.env.GLOBAL_PREFIX ?? 'api';
