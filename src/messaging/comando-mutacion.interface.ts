@@ -5,6 +5,9 @@ export interface ComandoMutacion<T = unknown> {
   usuario_id: string;
   usuario_email?: string;
   rol: string;
+  /** Solo en editar/eliminar espacio: el consumidor los lee de primer nivel, no del payload. */
+  espacio_id?: number;
+  condominio_id?: number;
   path: string;
   metodo: string;
   payload: T;

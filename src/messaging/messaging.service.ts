@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import type { MessageBroker } from './message-broker.interface';
 import type { ComandoMutacion } from './comando-mutacion.interface';
+import { buscarCola } from './colas';
 
 /**
  * Servicio de mensajería y nivelación de carga (Queue-based Load Leveling).
@@ -119,15 +120,20 @@ export class MessagingService
     options?: { priority?: number },
   ): Promise<void> {
     if (!this.isReady()) {
-      this.logger.warn(
-        `sendToQueue buffering/fallback (RabbitMQ no conectado aún): cola=${queue}`,
-      );
-      return;
+      this.logger.warn(`sendToQueue sin broker (RabbitMQ no conectado aún): cola=${queue}`);
+      throw new Error(`RabbitMQ no conectado: no se puede enviar a la cola ${queue}`);
+    }
+
+    // La cola se declara con los mismos argumentos que su consumidor (ver colas.ts):
+    // declararla con otros hace que RabbitMQ responda 406 PRECONDITION_FAILED.
+    const cola = buscarCola(queue);
+    if (!cola) {
+      throw new Error(`Cola no registrada en colas.ts: ${queue}`);
     }
 
     try {
       const buffer = Buffer.from(this.safeStringify(payload));
-      await this.channel!.assertQueue(queue, { durable: true });
+      await this.channel!.assertQueue(cola.nombre, cola.opciones);
       this.channel!.sendToQueue(queue, buffer, {
         persistent: true,
         contentType: 'application/json',
@@ -136,6 +142,8 @@ export class MessagingService
       this.logger.debug(`Mensaje nivelado enviado a cola ${queue}`);
     } catch (error) {
       this.logger.error(`Error enviando mensaje a cola ${queue}: ${String(error)}`);
+      // Se propaga: quien despacha un comando no debe responder 202 si no se publicó.
+      throw error;
     }
   }
 

@@ -1,9 +1,10 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import type { Request } from 'express';
 import { AsyncMutationService } from './async-mutation.service';
 import type { MessagingService } from '../messaging/messaging.service';
 import type { CognitoEmailService } from '../auth/cognito-email.service';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+import { COLAS } from '../messaging/colas';
 
 describe('AsyncMutationService', () => {
   let service: AsyncMutationService;
@@ -58,6 +59,70 @@ describe('AsyncMutationService', () => {
     mockMessaging.isReady = jest.fn().mockReturnValue(false);
     await expect(service.despachar('ESPACIOS', 'CREAR_RESERVA', mockReq, mockUser))
       .rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('responde 503 y no devuelve ticket si el broker rechaza la publicación (p. ej. 406)', async () => {
+    mockMessaging.encolarComando = jest
+      .fn()
+      .mockRejectedValue(new Error("PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange'"));
+    const intento = service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser);
+    await expect(intento).rejects.toThrow(ServiceUnavailableException);
+    await expect(intento).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 503, retryAfter: 5 }),
+    });
+  });
+
+  it('el 503 por fallo de publicación no filtra el detalle interno de AMQP al cliente', async () => {
+    mockMessaging.encolarComando = jest.fn().mockRejectedValue(new Error('PRECONDITION_FAILED secreto-interno'));
+    const error = await service
+      .despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser)
+      .catch((e: ServiceUnavailableException) => e);
+    expect(JSON.stringify((error as ServiceUnavailableException).getResponse())).not.toMatch(
+      /PRECONDITION|secreto-interno/,
+    );
+  });
+
+  describe('ids de espacio en editar/eliminar', () => {
+    const reqEspacio = (url: string, query: Record<string, unknown>) =>
+      ({ method: 'PUT', originalUrl: url, query, body: { nombre: 'Quincho' }, headers: {} }) as unknown as Request;
+
+    it.each(['ACTUALIZAR_ESPACIO', 'MODIFICAR_ESPACIO', 'ELIMINAR_ESPACIO'])(
+      '%s envía espacio_id y condominio_id de primer nivel',
+      async (accion) => {
+        const req = reqEspacio('/api/v1/espacios-comunes/espacios/12?condominio_id=3', { condominio_id: '3' });
+        await service.despachar('ESPACIOS', accion, req, mockUser);
+        expect(mockMessaging.encolarComando).toHaveBeenCalledWith(
+          'espacios_comandos_queue',
+          expect.objectContaining({ accion, espacio_id: 12, condominio_id: 3 }),
+        );
+      },
+    );
+
+    it.each([
+      ['sin condominio_id', '/api/v1/espacios-comunes/espacios/12', {}],
+      ['condominio_id no numérico', '/api/v1/espacios-comunes/espacios/12?condominio_id=x', { condominio_id: 'x' }],
+      ['sin id de espacio en la ruta', '/api/v1/espacios-comunes/espacios', { condominio_id: '3' }],
+      ['id de espacio cero', '/api/v1/espacios-comunes/espacios/0', { condominio_id: '3' }],
+    ])('400 y no encola: %s', async (_caso, url, query) => {
+      await expect(
+        service.despachar('ESPACIOS', 'ELIMINAR_ESPACIO', reqEspacio(url, query), mockUser),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockMessaging.encolarComando).not.toHaveBeenCalled();
+    });
+
+    it('CREAR_ESPACIO no agrega ids', async () => {
+      await service.despachar('ESPACIOS', 'CREAR_ESPACIO', reqEspacio('/api/v1/espacios-comunes/espacios', {}), mockUser);
+      const comando = (mockMessaging.encolarComando as jest.Mock).mock.calls[0][1];
+      expect(comando).not.toHaveProperty('espacio_id');
+      expect(comando).not.toHaveProperty('condominio_id');
+    });
+  });
+
+  it('usa las constantes de colas.ts para cada módulo', async () => {
+    await service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser);
+    await service.despachar('GASTOS', 'CREAR_GASTO', mockReq, mockUser);
+    const colas = (mockMessaging.encolarComando as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(colas).toEqual([COLAS.espaciosComandos.nombre, COLAS.gastosComandos.nombre]);
   });
 });
 
