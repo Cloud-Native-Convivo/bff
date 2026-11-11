@@ -28,6 +28,11 @@ describe('JwtAuthGuard', () => {
     expect(superCanActivate).toHaveBeenCalledTimes(1);
   });
 
+  it('exige JWT para consultar jobs aunque cuelguen de espacios', async () => {
+    await expect(guard.canActivate(contexto('GET', '/api/v1/espacios-comunes/jobs/abc-123'))).resolves.toBe(false);
+    expect(superCanActivate).toHaveBeenCalledTimes(1);
+  });
+
   it('exige JWT en métodos de escritura sobre espacios', async () => {
     await expect(guard.canActivate(contexto('POST', '/api/v1/espacios-comunes'))).resolves.toBe(false);
     expect(superCanActivate).toHaveBeenCalledTimes(1);
