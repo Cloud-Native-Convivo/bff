@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   ServiceUnavailableException,
   HttpStatus,
@@ -11,6 +12,8 @@ import { CognitoEmailService } from '../auth/cognito-email.service';
 import type { ComandoMutacion } from '../messaging/comando-mutacion.interface';
 import { COLAS } from '../messaging/colas';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+
+const ACCIONES_SOBRE_ESPACIO = new Set(['ACTUALIZAR_ESPACIO', 'MODIFICAR_ESPACIO', 'ELIMINAR_ESPACIO']);
 
 export interface Respuesta202 {
   ticket_id: string;
@@ -43,6 +46,8 @@ export class AsyncMutationService {
       });
     }
 
+    const idsEspacio = ACCIONES_SOBRE_ESPACIO.has(accion) ? this.idsDeEspacio(req) : undefined;
+
     const ticket_id = randomUUID();
     const queue =
       modulo === 'ESPACIOS' ? COLAS.espaciosComandos.nombre : COLAS.gastosComandos.nombre;
@@ -54,6 +59,7 @@ export class AsyncMutationService {
       usuario_id: user?.sub ?? 'anonimo',
       ...(usuario_email ? { usuario_email } : {}),
       rol: user?.roles?.[0] ?? 'residente',
+      ...idsEspacio,
       path: req.originalUrl,
       metodo: req.method,
       payload: req.body,
@@ -79,6 +85,18 @@ export class AsyncMutationService {
       status_url: `${prefix}/jobs/${ticket_id}`,
       creado_en: comando.timestamp,
     };
+  }
+
+  /** id del espacio (último segmento de la ruta) y condominio_id (query): el consumidor los exige. */
+  private idsDeEspacio(req: Request): { espacio_id: number; condominio_id: number } {
+    const espacio_id = Number(req.originalUrl.split('?')[0].split('/').filter(Boolean).pop());
+    const condominio_id = Number(req.query?.['condominio_id']);
+    for (const id of [espacio_id, condominio_id]) {
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new BadRequestException('El id del espacio y condominio_id deben ser enteros positivos');
+      }
+    }
+    return { espacio_id, condominio_id };
   }
 
   /**
