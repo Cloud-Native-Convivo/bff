@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import { MessagingService } from './messaging.service';
 import type { ComandoMutacion } from './comando-mutacion.interface';
+import { COLAS } from './colas';
 
 jest.mock('amqplib', () => ({ connect: jest.fn() }));
 const connect = amqp.connect as unknown as jest.Mock;
@@ -51,13 +52,13 @@ describe('MessagingService', () => {
 
   afterEach(() => jest.useRealTimers());
 
-  it('deshabilitado no conecta y publish/sendToQueue no fallan', async () => {
+  it('deshabilitado no conecta: publish no falla y sendToQueue lanza (sin broker no hay 202 falso)', async () => {
     const s = servicio({ rabbitmqEnabled: false });
     await s.onModuleInit();
     expect(connect).not.toHaveBeenCalled();
     expect(s.isReady()).toBe(false);
     await expect(s.publish('ex', 'rk', { a: 1 })).resolves.toBeUndefined();
-    await expect(s.sendToQueue('cola', 'texto')).resolves.toBeUndefined();
+    await expect(s.sendToQueue(COLAS.gastosComandos.nombre, 'texto')).rejects.toThrow(/no conectado/i);
   });
 
   it('conecta, declara exchange y publica JSON persistente', async () => {
@@ -74,10 +75,10 @@ describe('MessagingService', () => {
       expect.objectContaining({ persistent: true }),
     );
 
-    await s.sendToQueue('cola', 'hola', { priority: 5 });
-    expect(canal.assertQueue).toHaveBeenCalledWith('cola', { durable: true });
+    await s.sendToQueue(COLAS.gastosComandos.nombre, 'hola', { priority: 5 });
+    expect(canal.assertQueue).toHaveBeenCalledWith('gastos_comandos_queue', { durable: true });
     expect(canal.sendToQueue).toHaveBeenCalledWith(
-      'cola',
+      'gastos_comandos_queue',
       Buffer.from('hola'),
       expect.objectContaining({ priority: 5 }),
     );
@@ -97,7 +98,13 @@ describe('MessagingService', () => {
       timestamp: '2026-10-09T22:00:00.000Z',
     };
     await s.encolarComando('espacios_comandos_queue', comando);
-    expect(canal.assertQueue).toHaveBeenCalledWith('espacios_comandos_queue', { durable: true });
+    expect(canal.assertQueue).toHaveBeenCalledWith('espacios_comandos_queue', {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': 'espacios_dlx',
+        'x-dead-letter-routing-key': 'espacios_comandos_dlq',
+      },
+    });
     expect(canal.sendToQueue).toHaveBeenCalledWith(
       'espacios_comandos_queue',
       Buffer.from(JSON.stringify(comando)),
@@ -105,12 +112,53 @@ describe('MessagingService', () => {
     );
   });
 
-  it('errores del canal al publicar se registran sin lanzar', async () => {
+  it('errores del canal: publish se registra sin lanzar y sendToQueue propaga el error', async () => {
     const { s, canal } = await conectado();
     canal.assertExchange.mockRejectedValueOnce(new Error('canal cerrado'));
     canal.assertQueue.mockRejectedValueOnce(new Error('canal cerrado'));
     await expect(s.publish('ex', 'rk', 'x')).resolves.toBeUndefined();
-    await expect(s.sendToQueue('cola', 'x')).resolves.toBeUndefined();
+    await expect(s.sendToQueue(COLAS.gastosComandos.nombre, 'x')).rejects.toThrow('canal cerrado');
+    expect(canal.sendToQueue).not.toHaveBeenCalled();
+  });
+
+  it('reproduce el 406: si RabbitMQ rechaza la declaración, encolarComando lanza y no publica', async () => {
+    const { s, canal } = await conectado();
+    canal.assertQueue.mockRejectedValueOnce(
+      new Error("PRECONDITION_FAILED - inequivalent arg 'x-dead-letter-exchange'"),
+    );
+    await expect(s.encolarComando('espacios_comandos_queue', {} as ComandoMutacion)).rejects.toThrow(
+      /PRECONDITION_FAILED/,
+    );
+    expect(canal.sendToQueue).not.toHaveBeenCalled();
+  });
+
+  it('una cola no registrada en colas.ts lanza error en vez de declararse sin argumentos', async () => {
+    const { s, canal } = await conectado();
+    await expect(s.sendToQueue('cola_desconocida', 'x')).rejects.toThrow(/no registrada/i);
+    expect(canal.assertQueue).not.toHaveBeenCalled();
+    expect(canal.sendToQueue).not.toHaveBeenCalled();
+  });
+
+  it('contrato con ms-espacios-comunes: espacios_comandos_queue usa el mismo dead-letter que el consumidor', () => {
+    // Espejo de app/events/comandos_consumer.py (COLA_COMANDOS, EXCHANGE_DLX, COLA_COMANDOS_DLQ).
+    expect(COLAS.espaciosComandos).toEqual({
+      nombre: 'espacios_comandos_queue',
+      opciones: {
+        durable: true,
+        arguments: {
+          'x-dead-letter-exchange': 'espacios_dlx',
+          'x-dead-letter-routing-key': 'espacios_comandos_dlq',
+        },
+      },
+    });
+  });
+
+  it('contrato con ms-gastos-comunes: gastos_comandos_queue se declara sin argumentos', () => {
+    // Espejo de RabbitMqConfig.java (QueueBuilder.durable("gastos_comandos_queue").build()).
+    expect(COLAS.gastosComandos).toEqual({
+      nombre: 'gastos_comandos_queue',
+      opciones: { durable: true },
+    });
   });
 
   it('si el broker no responde, reintenta a los 10s', async () => {
@@ -166,7 +214,7 @@ describe('MessagingService', () => {
     await expect(s.publishFanout('ex_fan', { a: 1 })).resolves.toBeUndefined();
   });
 
-  it('publish, publishFanout y sendToQueue toleran payloads circulares sin lanzar excepcion no controlada', async () => {
+  it('publish y publishFanout toleran payloads circulares sin lanzar excepcion no controlada', async () => {
     const s = servicio({ rabbitmqEnabled: false });
     await s.onModuleInit();
     const circular: Record<string, unknown> = {};
@@ -174,6 +222,18 @@ describe('MessagingService', () => {
 
     await expect(s.publish('ex', 'rk', circular)).resolves.toBeUndefined();
     await expect(s.publishFanout('ex_fan', circular)).resolves.toBeUndefined();
-    await expect(s.sendToQueue('q', circular)).resolves.toBeUndefined();
+  });
+
+  it('sendToQueue con payload circular no revienta y envía un marcador', async () => {
+    const { s, canal } = await conectado();
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    await expect(s.sendToQueue(COLAS.gastosComandos.nombre, circular)).resolves.toBeUndefined();
+    expect(canal.sendToQueue).toHaveBeenCalledWith(
+      'gastos_comandos_queue',
+      Buffer.from('[Unserializable Payload]'),
+      expect.anything(),
+    );
   });
 });

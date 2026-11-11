@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   ServiceUnavailableException,
   HttpStatus,
@@ -9,7 +10,10 @@ import type { Request } from 'express';
 import { MessagingService } from '../messaging/messaging.service';
 import { CognitoEmailService } from '../auth/cognito-email.service';
 import type { ComandoMutacion } from '../messaging/comando-mutacion.interface';
+import { COLAS } from '../messaging/colas';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
+
+const ACCIONES_SOBRE_ESPACIO = new Set(['ACTUALIZAR_ESPACIO', 'MODIFICAR_ESPACIO', 'ELIMINAR_ESPACIO']);
 
 export interface Respuesta202 {
   ticket_id: string;
@@ -42,8 +46,11 @@ export class AsyncMutationService {
       });
     }
 
+    const idsEspacio = ACCIONES_SOBRE_ESPACIO.has(accion) ? this.idsDeEspacio(req) : undefined;
+
     const ticket_id = randomUUID();
-    const queue = modulo === 'ESPACIOS' ? 'espacios_comandos_queue' : 'gastos_comandos_queue';
+    const queue =
+      modulo === 'ESPACIOS' ? COLAS.espaciosComandos.nombre : COLAS.gastosComandos.nombre;
     const usuario_email = await this.resolverEmailSiAplica(accion, req, user);
     const comando: ComandoMutacion = {
       ticket_id,
@@ -52,13 +59,23 @@ export class AsyncMutationService {
       usuario_id: user?.sub ?? 'anonimo',
       ...(usuario_email ? { usuario_email } : {}),
       rol: user?.roles?.[0] ?? 'residente',
+      ...idsEspacio,
       path: req.originalUrl,
       metodo: req.method,
       payload: req.body,
       timestamp: new Date().toISOString(),
     };
 
-    await this.messaging.encolarComando(queue, comando);
+    try {
+      await this.messaging.encolarComando(queue, comando);
+    } catch (error) {
+      this.logger.error(`No se pudo encolar [${ticket_id}] ${modulo}:${accion}: ${String(error)}`);
+      throw new ServiceUnavailableException({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'No se pudo encolar la solicitud. Intenta nuevamente en unos segundos.',
+        retryAfter: 5,
+      });
+    }
     this.logger.log(`Mutacion encolada [${ticket_id}] -> ${queue} (${modulo}:${accion})`);
 
     const prefix = modulo === 'ESPACIOS' ? '/api/v1/espacios-comunes' : '/api/v1/gastos';
@@ -68,6 +85,18 @@ export class AsyncMutationService {
       status_url: `${prefix}/jobs/${ticket_id}`,
       creado_en: comando.timestamp,
     };
+  }
+
+  /** id del espacio (último segmento de la ruta) y condominio_id (query): el consumidor los exige. */
+  private idsDeEspacio(req: Request): { espacio_id: number; condominio_id: number } {
+    const espacio_id = Number(req.originalUrl.split('?')[0].split('/').filter(Boolean).pop());
+    const condominio_id = Number(req.query?.['condominio_id']);
+    for (const id of [espacio_id, condominio_id]) {
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new BadRequestException('El id del espacio y condominio_id deben ser enteros positivos');
+      }
+    }
+    return { espacio_id, condominio_id };
   }
 
   /**
