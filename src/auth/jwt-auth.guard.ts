@@ -1,4 +1,4 @@
-import { ExecutionContext, Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
@@ -9,7 +9,8 @@ import { PUBLIC_KEY } from './public.decorator';
 function isPublicEspacioGet(method: string, url: string): boolean {
   if (method !== 'GET') return false;
   const path = stripTrailingSlashes(url.split('?')[0]);
-  if (path.includes('/reservas')) return false;
+  // Reservas y jobs (resultado de comandos con datos del usuario) exigen JWT.
+  if (path.includes('/reservas') || path.includes('/jobs')) return false;
   return (
     path === '/api/v1/espacios-comunes' ||
     path.startsWith('/api/v1/espacios-comunes/') ||
@@ -28,6 +29,8 @@ function isPublicEspacioGet(method: string, url: string): boolean {
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private readonly reflector: Reflector) {
     super();
   }
@@ -68,21 +71,11 @@ export class JwtAuthGuard extends AuthGuard(['jwt-entra', 'jwt-cognito']) {
   ): TUser {
     if (err || !user) {
       const req = context.switchToHttp().getRequest<Request>();
-      const authHeader = req.headers?.authorization;
-      console.error('DEBUG Auth failure details:', {
-        url: req.url,
-        hasAuthorizationHeader: Boolean(authHeader),
-        authHeaderPrefix: authHeader ? authHeader.slice(0, 20) : 'NONE',
-        err: err instanceof Error ? err.message : err,
-        infoType: typeof info,
-        infoMessage: (info as any)?.message,
-        infoErrors: (info as any)?.errors?.map((e: any) => ({
-          name: e?.name,
-          message: e?.message,
-          stack: e?.stack?.slice(0, 150),
-        })),
-        rawInfo: info,
-      });
+      this.logger.debug(
+        `Auth rechazada ${req.method} ${req.url}: ${
+          err instanceof Error ? err.message : ((info as { message?: string } | undefined)?.message ?? 'sin usuario')
+        }`,
+      );
     }
     return super.handleRequest(err, user, info, context, status);
   }
