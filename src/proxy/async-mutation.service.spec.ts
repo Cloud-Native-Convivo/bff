@@ -118,6 +118,37 @@ describe('AsyncMutationService', () => {
     });
   });
 
+  describe('id de reserva en CANCELAR_RESERVA', () => {
+    const reqReserva = (url: string) =>
+      ({ method: 'DELETE', originalUrl: url, query: {}, body: {}, headers: {} }) as unknown as Request;
+
+    it('envía reserva_id de primer nivel tomado de la ruta', async () => {
+      await service.despachar('ESPACIOS', 'CANCELAR_RESERVA', reqReserva('/api/v1/espacios-comunes/reservas/5'), mockUser);
+      expect(mockMessaging.encolarComando).toHaveBeenCalledWith(
+        'espacios_comandos_queue',
+        expect.objectContaining({ accion: 'CANCELAR_RESERVA', reserva_id: 5 }),
+      );
+    });
+
+    it.each([
+      ['sin id en la ruta', '/api/v1/espacios-comunes/reservas'],
+      ['id no numérico', '/api/v1/espacios-comunes/reservas/abc'],
+      ['id cero', '/api/v1/espacios-comunes/reservas/0'],
+      ['id decimal', '/api/v1/espacios-comunes/reservas/1.5'],
+    ])('400 y no encola: %s', async (_caso, url) => {
+      await expect(service.despachar('ESPACIOS', 'CANCELAR_RESERVA', reqReserva(url), mockUser)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockMessaging.encolarComando).not.toHaveBeenCalled();
+    });
+
+    it('CREAR_RESERVA no agrega reserva_id', async () => {
+      await service.despachar('ESPACIOS', 'CREAR_RESERVA', mockReq, mockUser);
+      const comando = (mockMessaging.encolarComando as jest.Mock).mock.calls[0][1];
+      expect(comando).not.toHaveProperty('reserva_id');
+    });
+  });
+
   it('usa las constantes de colas.ts para cada módulo', async () => {
     await service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReq, mockUser);
     await service.despachar('GASTOS', 'CREAR_GASTO', mockReq, mockUser);
@@ -169,7 +200,7 @@ describe('AsyncMutationService — email en CREAR_RESERVA', () => {
   });
 
   it('no llama a Cognito para acciones que no son CREAR_RESERVA', async () => {
-    await service.despachar('ESPACIOS', 'CANCELAR_RESERVA', mockReqConBearer, mockUserCognito);
+    await service.despachar('ESPACIOS', 'CREAR_ESPACIO', mockReqConBearer, mockUserCognito);
     expect(mockCognitoEmail.obtenerEmail).not.toHaveBeenCalled();
   });
 

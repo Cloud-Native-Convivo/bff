@@ -1,3 +1,4 @@
+import { MethodNotAllowedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { HealthController } from '../health/health.controller';
@@ -77,10 +78,23 @@ describe('EspaciosProxyController', () => {
     expect(proxy.forwardEspacios.mock.calls[1][1]).toBe('/otra/ruta');
   });
 
+  it('eliminarReserva despacha CANCELAR_RESERVA, la accion que entiende el consumidor', async () => {
+    const r = req('DELETE', '/api/v1/espacios-comunes/reservas/5');
+    await controller.eliminarReserva(r, resFalso() as unknown as Response, usuario);
+    expect(asyncMut.despachar).toHaveBeenLastCalledWith('ESPACIOS', 'CANCELAR_RESERVA', r, usuario);
+  });
+
+  it.each(['actualizarReserva', 'modificarReserva'] as const)(
+    '%s responde 405 sin encolar: las reservas no se modifican',
+    (handler) => {
+      asyncMut.despachar.mockClear();
+      expect(() => controller[handler]()).toThrow(MethodNotAllowedException);
+      expect(asyncMut.despachar).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([
     'crearReserva',
-    'actualizarReserva',
-    'modificarReserva',
     'eliminarReserva',
     'crearEspacio',
     'actualizarEspacio',

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  MethodNotAllowedException,
   Patch,
   Post,
   Put,
@@ -24,6 +25,8 @@ const ESPACIOS_LEGACY_PREFIX = '/api/espacios';
 const RUTAS_RESERVAS = ['reservas', 'reservas/*path', ':id/reservas'];
 // Todo lo demás (alta en la raíz, /espacios y cualquier otra ruta).
 const RUTAS_ESPACIOS = ['', '*path'];
+
+const MENSAJE_RESERVA_INMUTABLE = 'Las reservas no se pueden modificar: cancela la reserva y crea una nueva';
 
 @Controller('v1/espacios-comunes')
 export class EspaciosProxyController {
@@ -50,24 +53,17 @@ export class EspaciosProxyController {
     return this.despacharMutacion('CREAR_RESERVA', req, res, user);
   }
 
+  // ms-espacios-comunes no permite modificar reservas: se cancela y se crea
+  // otra. Estas rutas existen para responder 405 sin encolar; si se quitaran,
+  // '*path' de espacios capturaría PUT/PATCH /reservas como edición de espacio.
   @Put(RUTAS_RESERVAS)
-  @HttpCode(HttpStatus.ACCEPTED)
-  async actualizarReserva(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-    @UsuarioActual() user?: UsuarioAutenticado,
-  ) {
-    return this.despacharMutacion('ACTUALIZAR_RESERVA', req, res, user);
+  actualizarReserva(): never {
+    throw new MethodNotAllowedException(MENSAJE_RESERVA_INMUTABLE);
   }
 
   @Patch(RUTAS_RESERVAS)
-  @HttpCode(HttpStatus.ACCEPTED)
-  async modificarReserva(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-    @UsuarioActual() user?: UsuarioAutenticado,
-  ) {
-    return this.despacharMutacion('MODIFICAR_RESERVA', req, res, user);
+  modificarReserva(): never {
+    throw new MethodNotAllowedException(MENSAJE_RESERVA_INMUTABLE);
   }
 
   @Delete(RUTAS_RESERVAS)
@@ -77,7 +73,8 @@ export class EspaciosProxyController {
     @Res({ passthrough: true }) res: Response,
     @UsuarioActual() user?: UsuarioAutenticado,
   ) {
-    return this.despacharMutacion('ELIMINAR_RESERVA', req, res, user);
+    // El consumidor solo conoce CANCELAR_RESERVA: la reserva se cancela, no se borra.
+    return this.despacharMutacion('CANCELAR_RESERVA', req, res, user);
   }
 
   // Las rutas de espacios deben registrarse después de las de reservas:
