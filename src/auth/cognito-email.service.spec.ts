@@ -17,6 +17,35 @@ describe('CognitoEmailService', () => {
     mockSend.mockReset();
   });
 
+  describe('emailDelUsuario', () => {
+    const cognito = { sub: 'sub-9', claims: { token_use: 'access', client_id: 'cli' } };
+
+    it('usuario de Cognito: resuelve con GetUser usando el access token', async () => {
+      mockSend.mockResolvedValue({ UserAttributes: [{ Name: 'email', Value: 'ana@convivo.cl' }] });
+      const service = new CognitoEmailService(config());
+
+      await expect(service.emailDelUsuario('Bearer tok', cognito)).resolves.toBe('ana@convivo.cl');
+      expect(mockSend).toHaveBeenCalledWith({ AccessToken: 'tok' });
+    });
+
+    it('usuario de Entra ID: usa el correo del token sin llamar a Cognito', async () => {
+      const service = new CognitoEmailService(config());
+
+      await expect(service.emailDelUsuario('Bearer tok', { sub: 'oid', correo: 'admin@convivo.cl', claims: {} })).resolves.toBe(
+        'admin@convivo.cl',
+      );
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it('sin correo resoluble devuelve undefined, no un valor inventado', async () => {
+      mockSend.mockResolvedValue({ UserAttributes: [] });
+      const service = new CognitoEmailService(config());
+
+      await expect(service.emailDelUsuario('Bearer tok', cognito)).resolves.toBeUndefined();
+      await expect(service.emailDelUsuario(undefined, undefined)).resolves.toBeUndefined();
+    });
+  });
+
   it('devuelve el email desde GetUser y lo cachea por sub', async () => {
     mockSend.mockResolvedValue({ UserAttributes: [{ Name: 'email', Value: 'ana@convivo.cl' }] });
     const service = new CognitoEmailService(config());

@@ -212,6 +212,8 @@ export class ProxyService {
     body?: unknown,
     headers?: HeadersEntrantes,
     user?: UsuarioAutenticado,
+    /** Headers de identidad que arma el propio bff (nunca copiados del cliente). */
+    extraHeaders?: Record<string, string>,
   ): Promise<unknown> {
     const fallbackUrl = this.config.get<string>('condominiosUrl') ?? 'http://localhost:8084';
     const baseUrl = await this.eureka.resolveServiceUrl('MS-CONDOMINIOS', fallbackUrl);
@@ -226,7 +228,7 @@ export class ProxyService {
         url,
         data: body,
         timeout,
-        headers: this.buildForwardHeaders(headers, user),
+        headers: { ...this.buildForwardHeaders(headers, user), ...extraHeaders },
       })) as { data: unknown };
 
       return data;
