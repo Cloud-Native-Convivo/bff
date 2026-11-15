@@ -47,6 +47,10 @@ export class AsyncMutationService {
     }
 
     const idsEspacio = ACCIONES_SOBRE_ESPACIO.has(accion) ? this.idsDeEspacio(req) : undefined;
+    const idReserva =
+      accion === 'CANCELAR_RESERVA'
+        ? { reserva_id: this.idDeRuta(req, 'El id de la reserva debe ser un entero positivo') }
+        : undefined;
 
     const ticket_id = randomUUID();
     const queue =
@@ -60,6 +64,7 @@ export class AsyncMutationService {
       ...(usuario_email ? { usuario_email } : {}),
       rol: user?.roles?.[0] ?? 'residente',
       ...idsEspacio,
+      ...idReserva,
       path: req.originalUrl,
       metodo: req.method,
       payload: req.body,
@@ -97,6 +102,15 @@ export class AsyncMutationService {
       }
     }
     return { espacio_id, condominio_id };
+  }
+
+  /** id de la reserva (último segmento de la ruta): el consumidor lo exige de primer nivel. */
+  private idDeRuta(req: Request, mensaje: string): number {
+    const id = Number(req.originalUrl.split('?')[0].split('/').filter(Boolean).pop());
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException(mensaje);
+    }
+    return id;
   }
 
   /**

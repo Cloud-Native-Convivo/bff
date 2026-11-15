@@ -8,6 +8,8 @@ export interface ComandoMutacion<T = unknown> {
   /** Solo en editar/eliminar espacio: el consumidor los lee de primer nivel, no del payload. */
   espacio_id?: number;
   condominio_id?: number;
+  /** Solo en CANCELAR_RESERVA: id tomado de la ruta, de primer nivel como espacio_id. */
+  reserva_id?: number;
   path: string;
   metodo: string;
   payload: T;
