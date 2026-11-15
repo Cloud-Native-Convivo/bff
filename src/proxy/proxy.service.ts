@@ -37,7 +37,9 @@ export function resolverRutaEspacios(path: string, body?: unknown): string {
 export function normalizarRutaEspacios(ruta: string): string {
   if (ruta === '' || ruta === '/' || ruta === '/espacios') return '/espacios/';
   if (ruta === '/reservas') return '/reservas/';
-  const recursoConocido = ['/espacios', '/reservas', '/health'].some((p) => ruta.startsWith(p));
+  // /jobs/:ticket es el sondeo de las mutaciones 202: sin estar aquí se reescribía
+  // a /espacios/jobs/:ticket y el microservicio respondía 404 hasta agotar el sondeo.
+  const recursoConocido = ['/espacios', '/reservas', '/health', '/jobs'].some((p) => ruta.startsWith(p));
   if (recursoConocido) return ruta;
   return ruta.startsWith('/') ? `/espacios${ruta}` : `/espacios/${ruta}`;
 }

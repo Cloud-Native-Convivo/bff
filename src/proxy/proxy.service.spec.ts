@@ -14,6 +14,7 @@ describe('normalizarRutaEspacios', () => {
     ['/espacios/3', '/espacios/3'],
     ['/reservas/9', '/reservas/9'],
     ['/health', '/health'],
+    ['/jobs/abc-123', '/jobs/abc-123'],
     ['/5', '/espacios/5'],
     ['5', '/espacios/5'],
   ])('%p -> %p', (entrada, esperado) => {
