@@ -3,13 +3,17 @@ import { Request } from "express";
 import { ProxyService } from "./proxy.service";
 import { Roles } from "../authorization/roles.decorator";
 import { UsuarioActual } from "../auth/usuario-actual.decorator";
+import { CognitoEmailService } from "../auth/cognito-email.service";
 import type { UsuarioAutenticado } from "../common/interfaces/usuario-autenticado";
 
 const CONDOMINIOS_PREFIX = "/api/condominios";
 
 @Controller(["condominios", "v1/condominios"])
 export class CondominiosProxyController {
-  constructor(private readonly proxy: ProxyService) {}
+  constructor(
+    private readonly proxy: ProxyService,
+    private readonly cognitoEmail: CognitoEmailService,
+  ) {}
 
   @Get(["/", "*path"])
   async listar(
@@ -25,6 +29,8 @@ export class CondominiosProxyController {
     @UsuarioActual() user?: UsuarioAutenticado,
   ) {
     const fullPath = req.originalUrl.split("?")[0];
+    // El admin identifica al residente por su correo, no por el sub de Cognito.
+    const email = await this.cognitoEmail.emailDelUsuario(req.headers.authorization, user);
     return this.proxy.forwardCondominios(
       "POST",
       fullPath.endsWith("/") ? "/solicitudes/" : "/solicitudes",
@@ -32,6 +38,7 @@ export class CondominiosProxyController {
       req.body,
       req.headers,
       user,
+      email ? { "x-usuario-email": email } : undefined,
     );
   }
 

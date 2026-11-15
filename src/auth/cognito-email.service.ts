@@ -53,6 +53,24 @@ export class CognitoEmailService {
     }
   }
 
+  /**
+   * Correo del usuario autenticado, o undefined si no se puede saber. Cognito
+   * lo resuelve con GetUser; Entra ID lo trae en el token (`correo`).
+   */
+  async emailDelUsuario(
+    authorization: string | undefined,
+    user?: { sub?: string; correo?: string; claims?: Record<string, unknown> },
+  ): Promise<string | undefined> {
+    const esCognito = user?.claims?.['token_use'] === 'access' && typeof user?.claims?.['client_id'] === 'string';
+    const accessToken = authorization?.startsWith('Bearer ') ? authorization.slice(7) : undefined;
+    if (esCognito && user?.sub && accessToken) {
+      const real = await this.obtenerEmail(accessToken, user.sub);
+      if (real) return real;
+    }
+    const delToken = user?.correo ?? user?.claims?.['email'];
+    return typeof delToken === 'string' && delToken ? delToken : undefined;
+  }
+
   private conTimeout<T>(promesa: Promise<T>): Promise<T> {
     let temporizador: ReturnType<typeof setTimeout>;
     const timeout = new Promise<never>((_, reject) => {
