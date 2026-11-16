@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import { GastosPdfProxyController } from './gastos-pdf-proxy.controller';
 import { MessagingService } from '../messaging/messaging.service';
 import { ProxyService } from './proxy.service';
@@ -97,7 +97,33 @@ describe('GastosPdfProxyController', () => {
     );
   });
 
-  it('usuario Cognito sin GetUser disponible: cae al placeholder en vez de fallar la solicitud', async () => {
+  it('sin unidad en el token ni en el body responde 400 y no publica nada', async () => {
+    const mockRes = { status: jest.fn().mockReturnThis(), setHeader: jest.fn().mockReturnThis() } as unknown as Response;
+    const user = { sub: 'u-1', roles: ['residente' as const], claims: {} };
+
+    await expect(
+      controller.solicitarPdf({ mes: 'Noviembre 2026' }, { headers: {} } as Request, mockRes, user),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.solicitarPdf({ unidadId: '   ' }, { headers: {} } as Request, mockRes, user),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(messagingService.publishFanout).not.toHaveBeenCalled();
+  });
+
+  it('sin mes en el body no inyecta un mes fijo: el campo queda fuera del mensaje', async () => {
+    const mockRes = { status: jest.fn().mockReturnThis(), setHeader: jest.fn().mockReturnThis() } as unknown as Response;
+    const user = { sub: 'u-1', correo: 'a@b.cl', roles: ['residente' as const], claims: {} };
+
+    await controller.solicitarPdf({ unidadId: 'Casa M202' }, { headers: {} } as Request, mockRes, user);
+
+    const mensaje = messagingService.publishFanout.mock.calls[0][1] as Record<string, unknown>;
+    expect(mensaje.mes).toBeUndefined();
+    expect(mensaje.unidad_id).toBe('Casa M202');
+    expect(mensaje.usuario_id).toBe('u-1');
+    expect(JSON.stringify(mensaje)).not.toMatch(/Agosto 2026|301-A|usr-anon/);
+  });
+
+  it('usuario Cognito sin GetUser disponible: no inventa un correo, pero tampoco falla la solicitud', async () => {
     const mockRes = {
       status: jest.fn().mockReturnThis(),
       setHeader: jest.fn().mockReturnThis(),
@@ -114,10 +140,9 @@ describe('GastosPdfProxyController', () => {
 
     await controller.solicitarPdf({ unidadId: '301-A' }, mockReq, mockRes, user);
 
-    expect(messagingService.publishFanout).toHaveBeenCalledWith(
-      'gastos.pdf.fanout',
-      expect.objectContaining({ email: 'residente@convivo.cl' }),
-    );
+    const mensaje = messagingService.publishFanout.mock.calls[0][1] as Record<string, unknown>;
+    expect(mensaje.email).toBeUndefined();
+    expect(mensaje.unidad_id).toBe('301-A');
   });
 
   it('debe descargar binario del pdf usando forwardGastosBinary', async () => {
