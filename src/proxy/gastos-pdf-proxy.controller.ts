@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -32,17 +33,26 @@ export class GastosPdfProxyController {
     @UsuarioActual() user?: UsuarioAutenticado,
   ) {
     const ticketId = randomUUID();
-    const unidadId = (user?.claims?.['custom:unidad'] as string) ?? (user?.claims?.unidad as string) ?? body?.unidadId ?? '301-A';
+    const unidadId = (
+      (user?.claims?.['custom:unidad'] as string | undefined) ??
+      (user?.claims?.unidad as string | undefined) ??
+      body?.unidadId
+    )?.trim();
+    // Sin unidad real no se emite un comprobante de una unidad inventada.
+    if (!unidadId) {
+      throw new BadRequestException('No se pudo determinar la unidad para el comprobante');
+    }
     const email = await this.resolverEmail(req, user);
-    const mes = body?.mes ?? 'Agosto 2026';
-    const usuarioId = user?.sub ?? 'usr-anon';
+    // Sin mes, ms-gastos-comunes usa el mes actual; el BFF no elige uno fijo.
+    const mes = body?.mes?.trim() || undefined;
 
+    // Los campos sin dato quedan fuera del mensaje (JSON omite `undefined`) en vez de llevar un valor inventado.
     await this.messagingService.publishFanout('gastos.pdf.fanout', {
       ticket_id: ticketId,
       unidad_id: unidadId,
       email,
       mes,
-      usuario_id: usuarioId,
+      usuario_id: user?.sub,
       creado_en: new Date().toISOString(),
     });
 
@@ -87,7 +97,7 @@ export class GastosPdfProxyController {
    * token lo trae) — mismo problema que resuelve AsyncMutationService para
    * reservas. Entra ID (panel admin) sí lo trae directo en el JWT.
    */
-  private async resolverEmail(req: Request, user?: UsuarioAutenticado): Promise<string> {
+  private async resolverEmail(req: Request, user?: UsuarioAutenticado): Promise<string | undefined> {
     const esCognito = user?.claims?.['token_use'] === 'access' && typeof user?.claims?.['client_id'] === 'string';
     if (esCognito && user?.sub) {
       const authHeader = req.headers.authorization;
@@ -97,6 +107,7 @@ export class GastosPdfProxyController {
         if (real) return real;
       }
     }
-    return user?.correo ?? (user?.claims?.email as string) ?? 'residente@convivo.cl';
+    // Sin correo conocido no se inventa uno: ms-gastos-comunes omite el aviso por correo.
+    return user?.correo ?? (user?.claims?.email as string | undefined);
   }
 }
