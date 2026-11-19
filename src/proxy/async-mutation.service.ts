@@ -14,6 +14,13 @@ import { COLAS } from '../messaging/colas';
 import type { UsuarioAutenticado } from '../common/interfaces/usuario-autenticado';
 
 const ACCIONES_SOBRE_ESPACIO = new Set(['ACTUALIZAR_ESPACIO', 'MODIFICAR_ESPACIO', 'ELIMINAR_ESPACIO']);
+// Campo del payload donde ComandoGastosConsumer lee el id del gasto (null: la acción no lleva id).
+const CAMPO_ID_GASTO: Record<string, 'id' | 'gasto_id' | null> = {
+  REGISTRAR_GASTO: null,
+  ACTUALIZAR_GASTO: 'id',
+  ELIMINAR_GASTO: 'id',
+  REGISTRAR_PAGO: 'gasto_id',
+};
 
 export interface Respuesta202 {
   ticket_id: string;
@@ -51,6 +58,7 @@ export class AsyncMutationService {
       accion === 'CANCELAR_RESERVA'
         ? { reserva_id: this.idDeRuta(req, 'El id de la reserva debe ser un entero positivo') }
         : undefined;
+    const idsGasto = accion in CAMPO_ID_GASTO ? this.idsDeGasto(accion, req) : undefined;
 
     const ticket_id = randomUUID();
     const queue =
@@ -67,7 +75,7 @@ export class AsyncMutationService {
       ...idReserva,
       path: req.originalUrl,
       metodo: req.method,
-      payload: req.body,
+      payload: idsGasto ? { ...req.body, ...idsGasto } : req.body,
       timestamp: new Date().toISOString(),
     };
 
@@ -102,6 +110,29 @@ export class AsyncMutationService {
       }
     }
     return { espacio_id, condominio_id };
+  }
+
+  /**
+   * id del gasto (ruta) y condominio (query, o body en el alta) dentro del payload,
+   * que es donde los lee ms-gastos-comunes. Se agregan al final para que manden
+   * sobre un id o condominio_id que venga en el body.
+   */
+  private idsDeGasto(accion: string, req: Request): Record<string, number | string> {
+    const query = req.query?.['condominioId'];
+    const body = (req.body as { condominioId?: unknown } | undefined)?.condominioId;
+    const condominio_id = String(typeof query === 'string' ? query : (body ?? '')).trim();
+    if (!condominio_id) {
+      throw new BadRequestException('condominioId es obligatorio');
+    }
+    const campo = CAMPO_ID_GASTO[accion];
+    if (!campo) {
+      return { condominio_id };
+    }
+    const id = Number(req.params?.['id']);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('El id del gasto debe ser un entero positivo');
+    }
+    return { [campo]: id, condominio_id };
   }
 
   /** id de la reserva (último segmento de la ruta): el consumidor lo exige de primer nivel. */

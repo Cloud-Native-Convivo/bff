@@ -135,12 +135,12 @@ describe('GastosProxyController', () => {
     );
   });
 
-  it('despacha mutaciones no-GET hacia asyncMutation con 202 Accepted', async () => {
+  it('despacha el alta como REGISTRAR_GASTO hacia asyncMutation con 202 Accepted', async () => {
     const res = resFalso();
     const r = req('POST', '/api/gastos/api/v1/gastos-comunes', { monto: 50000 });
-    const resultado = await controller.forward(r, res as unknown as Response, usuario);
+    const resultado = await controller.registrarGasto(r, res as unknown as Response, usuario);
     expect(resultado).toMatchObject({ ticket_id: 'ticket-123', estado: 'EN_COLA' });
-    expect(asyncMut.despachar).toHaveBeenCalledWith('GASTOS', 'POST_GASTO', r, usuario);
+    expect(asyncMut.despachar).toHaveBeenCalledWith('GASTOS', 'REGISTRAR_GASTO', r, usuario);
     expect(res.status).toHaveBeenCalledWith(202);
   });
 });
